@@ -44,7 +44,7 @@ Joanna Duran, Nikhil Gupta, Max Moro
 * Build a model to predict the statistical variation of the output with respect to the process
     - i.e. model needs to include all statistical parameters at a minimum
     - Target accuracy: +/- 10% required, but +/- 15% would be acceptable also
-* Build a model to predict the mean value of he output
+* Build a model to predict the mean value of the output
     - Free to choose any variables of liking from the model
     - Target accuracy: +/- 10% required, but +/- 15% would be acceptable also
   
