@@ -11,22 +11,28 @@ Joanna Duran, Nikhil Gupta, Max Moro
     - Manufacturing process variation leads to output variables varying between a min and max value (typically measured after the manufacturing process – all R&D done – can lead to issues if the variation of output is outside target specs)
     - Not all values can be practically measured (due to time, resource and cost constraints)
 *	Can we predict the limits before the integrated circuits are manufactured to preemptively make changes when specs are expected to be out of range?
-	Yes, using electrical simulation (+ running Monte Carlo simulations)
-	However, this is very resource intensive as each electrical simulation can take several hours
-	Alternate: Build a model to predict the performance (min, typ, max) of the output variable 
-•	Describe Dataset
-o	Variables controlled by engineers: 
-	x1 – xn
-	values range dependent on variables
-•	some are between 1 to 100
-•	other are in nano or micro range               
-o	Process Variation (beyond human control): stat1 – statn
-	Represents various statistical parameters
-	Variable values represent the sigma variation around the mean
-	Range is from -4 (sigma) to 4 (sigma)
-•	Goals:
-o	Build a model to predict the statistical variation of the output with respect to the process
-	i.e. model needs to include all statistical parameters at a minimum
-•	Target accuracy: 
-o	+/- 10% required, but +/- 15% would be acceptable also.
+    - Yes, using electrical simulation (+ running Monte Carlo simulations)
+    - However, this is very resource intensive as each electrical simulation can take several hours
+    - Alternate: Build a model to predict the performance (min, typ, max) of the output variable 
+
+## Dataset
+* Variables controlled by engineers: 
+    - x1 – xn
+    - values range dependent on variables
+        - Some are between 1 to 100
+        - other are in nano or micro range               
+* Process Variation (beyond human control): stat1 – statn
+    - Represents various statistical parameters
+    - Variable values represent the sigma variation around the mean
+    - Range is from -4 (sigma) to 4 (sigma)
+
+# Goals:
+* Build a model to predict the statistical variation of the output with respect to the process
+    - i.e. model needs to include all statistical parameters at a minimum
+    - Target accuracy: +/- 10% required, but +/- 15% would be acceptable also
+* Build a model to predict the mean value of he output
+    - Free to choose any variables of liking from the model
+    - Target accuracy: +/- 10% required, but +/- 15% would be acceptable also
+    
+
 
