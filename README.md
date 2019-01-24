@@ -39,7 +39,7 @@ Joanna Duran, Nikhil Gupta, Max Moro
     - JobName corresponsing to features.csv file
     - NA values will need to be removed
   
-# Goals:
+## Goals:
 * Pick at least 1 output variable 
 * Build a model to predict the statistical variation of the output with respect to the process
     - i.e. model needs to include all statistical parameters at a minimum
@@ -47,6 +47,8 @@ Joanna Duran, Nikhil Gupta, Max Moro
 * Build a model to predict the mean value of he output
     - Free to choose any variables of liking from the model
     - Target accuracy: +/- 10% required, but +/- 15% would be acceptable also
-    
+  
+## Sponsor
+* Data has been sponsored and approved for use by Texas Instruments Inc. 
 
 
