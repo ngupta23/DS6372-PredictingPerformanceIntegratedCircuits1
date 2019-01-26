@@ -10,7 +10,7 @@ Joanna Duran, Nikhil Gupta, Max Moro
 * Challenges
     - Manufacturing process variation leads to output variables varying between a min and max value (typically measured after the manufacturing process – all R&D done – can lead to issues if the variation of output is outside target specs)
     - Not all values can be practically measured (due to time, resource and cost constraints)
-    - An example can be seen below. Each horizonatal line is a single output and can have a typical, maximum and minimum value. As seen in this example, not all values are populated.
+    - An example can be seen below. Each horizonatal line is a single output and can have a typical, maximum and minimum value. As seen in this example, not all values are populated - [Reference](http://www.ti.com/lit/ds/symlink/tps54620.pdf).
     - ![Example outputs](Images/egStatVarSemiconductor.png?raw=true "Title")
 *	Can we predict the limits before the integrated circuits are manufactured to preemptively make changes when specs are expected to be out of range?
     - Yes, using electrical simulation (+ running Monte Carlo simulations)
