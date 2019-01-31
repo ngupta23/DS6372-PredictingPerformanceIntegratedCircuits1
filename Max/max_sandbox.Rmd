@@ -7,8 +7,10 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(usdm) #for multicollinearity
 library(tidyverse)
 library(ggplot2)
+
 ```
 
 # Loading Data
@@ -16,7 +18,7 @@ library(ggplot2)
 ```{r load}
 feat  = read.csv('../Data/features.csv')
 labels = read.csv('../Data/labels.csv')
-predictors = names(select(feat,-JobName))
+predictors = names(dplyr::select(feat,-JobName))
 target = 'y3'
 data = inner_join(feat,select_at(labels,c('JobName',target)),by='JobName')
 ```
@@ -65,8 +67,14 @@ ggplot(gather(select_at(data,predictors)), aes(value)) +
   facet_wrap(~key, scales = 'free',ncol=4)
 ```
 
+# Multicollinearity - VIF
 
+No Multicollinearity among predictors
 
+```{r vif}
+vifDF = usdm::vif(select_at(data,predictors)) %>%
+  arrange(desc(VIF))
+head(vifDF,10)
+```
 
-# Transformation
  
