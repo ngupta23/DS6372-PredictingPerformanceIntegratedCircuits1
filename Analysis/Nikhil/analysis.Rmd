@@ -1,0 +1,223 @@
+---
+title: "Model Analysis"
+author: "Nikhil Gupta"
+date: "`r Sys.time()`"
+output:
+ html_document:
+   toc: true
+   toc_float: true
+   toc_depth: 3
+params:
+  output.var: 'y3'
+  log.pred: FALSE
+  eda: FALSE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+sessionInfo()
+```
+
+```{r}
+# # https://gist.github.com/smithdanielle/9913897
+# check.packages <- function(pkg){
+#     new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+#     if (length(new.pkg)) 
+#         install.packages(new.pkg, dependencies = TRUE)
+#     #sapply(pkg, require, character.only = TRUE)
+#     sapply(pkg, library, character.only = TRUE) # see comment below in GitHub repo
+# }
+# 
+# # Usage example
+# packages<-c("ggplot2", "dplyr", "caret", "caTools", "neuralnet", "tictoc", "randomForest", "DT", "e1071", "xgboost")
+# check.packages(packages)
+
+library(dplyr)
+library(DT)
+library(mosaic)
+library(MASS)
+```
+
+# User Inputs
+```{r User Inputs}
+output.var = params$output.var
+log.pred = params$log.pred
+eda = params$eda
+
+message("Parameters used for training/prediction: ")
+str(params)
+```
+
+```{r}
+# Setup Labels
+# alt.scale.label.name = Alternate Scale variable name
+#   - if predicting on log, then alt.scale is normal scale
+#   - if predicting on normal scale, then alt.scale is log scale
+if (log.pred == TRUE){
+  label.names = paste('log.',output.var,sep="")
+  alt.scale.label.name = output.var
+}
+if (log.pred == FALSE){
+  label.names = output.var
+  alt.scale.label.name = paste('log.',output.var,sep="")
+}
+```
+
+
+# Prepare Data
+
+## Read and Clean Features
+```{r}
+features = read.csv("../../Data/features.csv")
+str(features) 
+```
+
+
+### Checking correlations to evaluate removal of redundant features
+```{r Correlations}
+corr.matrix = round(cor(features[sapply(features, is.numeric)]),2)
+
+# filter out only highly correlated variables
+threshold = 0.6
+corr.matrix.tmp = corr.matrix
+diag(corr.matrix.tmp) = 0
+high.corr = apply(abs(corr.matrix.tmp) >= threshold, 1, any)
+high.corr.matrix = corr.matrix.tmp[high.corr, high.corr]
+
+DT::datatable(corr.matrix)
+DT::datatable(high.corr.matrix)
+```
+
+### Clean Column Names
+```{r}
+
+```
+
+### Feature Names
+```{r}
+feature.names = colnames(features)
+drops <- c('JobName')
+feature.names = feature.names[!(feature.names %in% drops)]
+str(feature.names)
+```
+
+## Read and Clean Labels
+```{r}
+labels = read.csv("../../Data/labels.csv")
+#str(labels)
+labels = labels[,c("JobName", output.var)]
+summary(labels)
+```
+
+### Clean Column Names
+## Merge Datasets
+```{r}
+data <- merge(features, labels, by = 'JobName')
+drops <- c('JobName')
+data = data[,(!colnames(data) %in% drops)]
+str(data)
+```
+
+
+## Transformations
+```{r}
+#str(data)
+if (log.pred == TRUE){
+  data[label.names] = log(data[alt.scale.label.name],10)
+  #drops = c(alt.scale.label.name)
+  #data = data[!(names(data) %in% drops)]
+}
+#str(data)
+```
+
+
+# Exploratory Data Analysis
+
+## Scatterplots
+```{r}
+panel.hist <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+```
+
+```{r}
+if (eda == TRUE){
+  hist(data[complete.cases(data),label.names])
+  #hist(data[complete.cases(data),alt.scale.label.name])
+}
+```
+
+```{r}
+# https://stackoverflow.com/questions/24648729/plot-one-numeric-variable-against-n-numeric-variables-in-n-plots
+ind.pairs.plot <- function(data, xvars=NULL, yvar)
+{
+    df <- data
+    if (is.null(xvars)) {
+        xvars = names(data[which(names(data)!=yvar)])       
+    }   
+
+    # if (length(xvars) > 25) {
+    #         print("Warning: number of variables to be plotted exceeds 25, only first 25 will be plotted")
+    #         xvars = xvars[1:25]
+    # }
+
+    #choose a format to display charts
+    ncharts <- length(xvars) 
+    # nrows = ceiling(sqrt(ncharts))
+    # ncols = ceiling(ncharts/nrows)  
+    # par(mfrow = c(nrows,ncols))
+
+    for(i in 1:ncharts){    
+        plot(df[,xvars[i]],df[,yvar], xlab = xvars[i], ylab = yvar)
+    }
+}
+
+if (eda == TRUE){
+  ind.pairs.plot(data, feature.names, label.names)
+}
+
+```
+
+
+## Feature Engineering
+```{r}
+if(eda ==TRUE){
+  # x18 may need transformations
+  plot(data[,'x18'], data[,label.names], main = "Original Scatter Plot vs. x18", ylab = label.names, xlab = 'x18')
+  plot(sqrt(data[,'x18']), data[,label.names], main = "Original Scatter Plot vs. sqrt(x18)", ylab = label.names, xlab = 'sqrt(x18)')
+  plot((data[,'x18'])^2, data[,label.names], main = "Original Scatter Plot vs. square(x18)", ylab = label.names, xlab = 'x18**2')
+  
+  # what about x7, x9?
+  # x11 looks like data is at discrete points after a while. Will this be a problem?
+}
+```
+
+```{r}
+data = data[complete.cases(data),]
+```
+
+# Modeling
+
+```{r}
+# label.names
+# summary(data[,'y3'])
+model = lm(y3 ~ ., data)
+summary(model)
+```
+
+```{r}
+stepAIC(model, direction = "both", trace = FALSE) #$anova
+```
+
+```{r}
+
+```
