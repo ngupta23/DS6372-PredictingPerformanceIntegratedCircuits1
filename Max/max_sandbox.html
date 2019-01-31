@@ -205,7 +205,7 @@ data = inner_join(feat,select_at(labels,c('JobName',target)),by='JobName')</code
 <pre class="r"><code>data.cc  = complete.cases(data)
 data.notComplete = data[! data.cc,]
 data.complete = data[data.cc,]</code></pre>
-<p><strong>Question</strong>: Y3 has most of the non-complete cases, should we interpolate, or these are the case for prediction?</p>
+<p><strong>Question</strong>: Y3 has all the non-complete casesI guess hese are the cases for prediction, right?</p>
 <p>No na cases on features :)</p>
 <pre class="r"><code>feat.cc  = complete.cases(feat)
 feat.notComplete = feat[! feat.cc,]
