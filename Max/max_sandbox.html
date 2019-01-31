@@ -204,12 +204,16 @@ data = inner_join(feat,select_at(labels,c('JobName',target)),by='JobName')</code
 <h1>Data validation</h1>
 <pre class="r"><code>data.cc  = complete.cases(data)
 data.notComplete = data[! data.cc,]
-data.complete = data[data.cc,]</code></pre>
+data.complete = data[data.cc,]
+message('Non-Complete cases: ',nrow(data.notComplete))</code></pre>
+<pre><code>## Non-Complete cases: 2497</code></pre>
 <p><strong>Question</strong>: Y3 has all the non-complete casesI guess hese are the cases for prediction, right?</p>
-<p>No na cases on features :)</p>
+<p>No null-cases on features :)</p>
 <pre class="r"><code>feat.cc  = complete.cases(feat)
 feat.notComplete = feat[! feat.cc,]
-feat.complete = feat[feat.cc,]</code></pre>
+feat.complete = feat[feat.cc,]
+message('Non-Complete cases: ',nrow(feat.notComplete))</code></pre>
+<pre><code>## Non-Complete cases: 0</code></pre>
 </div>
 <div id="distribution" class="section level1">
 <h1>Distribution</h1>
