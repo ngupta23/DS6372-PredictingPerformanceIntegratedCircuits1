@@ -16,8 +16,8 @@ library(ggplot2)
 # Loading Data
 
 ```{r load}
-feat  = read.csv('../Data/features.csv')
-labels = read.csv('../Data/labels.csv')
+feat  = read.csv('../../Data/features.csv')
+labels = read.csv('../../Data/labels.csv')
 predictors = names(dplyr::select(feat,-JobName))
 target = 'y3'
 data = inner_join(feat,select_at(labels,c('JobName',target)),by='JobName')
