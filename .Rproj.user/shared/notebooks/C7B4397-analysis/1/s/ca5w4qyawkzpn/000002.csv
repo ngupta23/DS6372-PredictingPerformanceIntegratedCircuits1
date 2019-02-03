@@ -1,0 +1,4 @@
+"0","feature.names = colnames(features)"
+"0","drops <- c('JobName')"
+"0","feature.names = feature.names[!(feature.names %in% drops)]"
+"0","#str(feature.names)"

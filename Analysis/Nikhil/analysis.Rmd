@@ -10,7 +10,12 @@ output:
 params:
   output.var: 'y3'
   log.pred: FALSE
-  eda: FALSE
+  eda: TRUE
+  algo.forward: FALSE
+  algo.backward: FALSE
+  algo.stepwise: FALSE
+  algo.LASSO: FALSE
+  algo.LARS: FALSE
 ---
 
 ```{r setup, include=FALSE}
@@ -21,24 +26,30 @@ knitr::opts_chunk$set(echo = TRUE)
 sessionInfo()
 ```
 
-```{r}
-# # https://gist.github.com/smithdanielle/9913897
-# check.packages <- function(pkg){
-#     new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-#     if (length(new.pkg)) 
-#         install.packages(new.pkg, dependencies = TRUE)
-#     #sapply(pkg, require, character.only = TRUE)
-#     sapply(pkg, library, character.only = TRUE) # see comment below in GitHub repo
-# }
-# 
-# # Usage example
-# packages<-c("ggplot2", "dplyr", "caret", "caTools", "neuralnet", "tictoc", "randomForest", "DT", "e1071", "xgboost")
-# check.packages(packages)
+```{r include=FALSE}
+# https://gist.github.com/smithdanielle/9913897
+check.packages <- function(pkg){
+    new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+    if (length(new.pkg))
+        install.packages(new.pkg, dependencies = TRUE)
+    #sapply(pkg, require, character.only = TRUE)
+    sapply(pkg, library, character.only = TRUE) # see comment below in GitHub repo
+}
+
+# Usage example
+packages<-c("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet")
+check.packages(packages)
 
 library(dplyr)
 library(DT)
 library(mosaic)
 library(MASS)
+library(usdm) #for multicollinearity
+library(tidyverse)
+library(ggplot2)
+library(PerformanceAnalytics)
+library(caTools)
+library(glmnet)
 ```
 
 # User Inputs
@@ -46,6 +57,11 @@ library(MASS)
 output.var = params$output.var
 log.pred = params$log.pred
 eda = params$eda
+algo.forward = params$algo.forward
+algo.backward = params$algo.backward
+algo.stepwise = params$algo.stepwise
+algo.LASSO = params$algo.LASSO
+algo.LARS = params$algo.LARS
 
 message("Parameters used for training/prediction: ")
 str(params)
@@ -72,12 +88,12 @@ if (log.pred == FALSE){
 ## Read and Clean Features
 ```{r}
 features = read.csv("../../Data/features.csv")
-str(features) 
+#str(features) 
 ```
 
 
 ### Checking correlations to evaluate removal of redundant features
-```{r Correlations}
+```{r Correlation of inputs to each other}
 corr.matrix = round(cor(features[sapply(features, is.numeric)]),2)
 
 # filter out only highly correlated variables
@@ -91,17 +107,13 @@ DT::datatable(corr.matrix)
 DT::datatable(high.corr.matrix)
 ```
 
-### Clean Column Names
-```{r}
-
-```
 
 ### Feature Names
 ```{r}
 feature.names = colnames(features)
 drops <- c('JobName')
 feature.names = feature.names[!(feature.names %in% drops)]
-str(feature.names)
+#str(feature.names)
 ```
 
 ## Read and Clean Labels
@@ -112,25 +124,45 @@ labels = labels[,c("JobName", output.var)]
 summary(labels)
 ```
 
-### Clean Column Names
 ## Merge Datasets
 ```{r}
 data <- merge(features, labels, by = 'JobName')
 drops <- c('JobName')
 data = data[,(!colnames(data) %in% drops)]
-str(data)
+#str(data)
 ```
-
 
 ## Transformations
 ```{r}
 #str(data)
 if (log.pred == TRUE){
   data[label.names] = log(data[alt.scale.label.name],10)
-  #drops = c(alt.scale.label.name)
-  #data = data[!(names(data) %in% drops)]
+  
+  drops = c(alt.scale.label.name)
+  data = data[!(names(data) %in% drops)]
 }
 #str(data)
+```
+
+## Remove NA Cases
+```{r}
+data = data[complete.cases(data),]
+```
+
+## Check correlation of Label with Featires
+```{r Correlation of features to label}
+if (eda == TRUE){
+  corr.to.label =round(cor(dplyr::select(data,-one_of(label.names)),dplyr::select_at(data,label.names)),4)
+  DT::datatable(corr.to.label)
+}
+```
+
+## Multicollinearity - VIF
+```{r vif}
+if (eda == TRUE){
+  vifDF = usdm::vif(select_at(data,feature.names)) %>% arrange(desc(VIF))
+  head(vifDF,10)
+}
 ```
 
 
@@ -151,7 +183,7 @@ panel.hist <- function(x, ...)
 
 ```{r}
 if (eda == TRUE){
-  hist(data[complete.cases(data),label.names])
+  hist(data[ ,label.names])
   #hist(data[complete.cases(data),alt.scale.label.name])
 }
 ```
@@ -165,17 +197,9 @@ ind.pairs.plot <- function(data, xvars=NULL, yvar)
         xvars = names(data[which(names(data)!=yvar)])       
     }   
 
-    # if (length(xvars) > 25) {
-    #         print("Warning: number of variables to be plotted exceeds 25, only first 25 will be plotted")
-    #         xvars = xvars[1:25]
-    # }
-
     #choose a format to display charts
     ncharts <- length(xvars) 
-    # nrows = ceiling(sqrt(ncharts))
-    # ncols = ceiling(ncharts/nrows)  
-    # par(mfrow = c(nrows,ncols))
-
+    
     for(i in 1:ncharts){    
         plot(df[,xvars[i]],df[,yvar], xlab = xvars[i], ylab = yvar)
     }
@@ -190,34 +214,175 @@ if (eda == TRUE){
 
 ## Feature Engineering
 ```{r}
-if(eda ==TRUE){
+if(eda ==FALSE){
   # x18 may need transformations
   plot(data[,'x18'], data[,label.names], main = "Original Scatter Plot vs. x18", ylab = label.names, xlab = 'x18')
   plot(sqrt(data[,'x18']), data[,label.names], main = "Original Scatter Plot vs. sqrt(x18)", ylab = label.names, xlab = 'sqrt(x18)')
-  plot((data[,'x18'])^2, data[,label.names], main = "Original Scatter Plot vs. square(x18)", ylab = label.names, xlab = 'x18**2')
+  
+  # transforming x18
+  data$sqrt.x18 = sqrt(data$x18)
+  data = dplyr::select(data,-one_of('x18'))
   
   # what about x7, x9?
   # x11 looks like data is at discrete points after a while. Will this be a problem?
 }
 ```
 
-```{r}
-data = data[complete.cases(data),]
-```
 
 # Modeling
 
+
+##  Train Test Split
+
 ```{r}
-# label.names
-# summary(data[,'y3'])
-model = lm(y3 ~ ., data)
-summary(model)
+data = data[sample(nrow(data)),] # randomly shuffle data
+split = sample.split(data[,label.names], SplitRatio = 0.8)
+
+data.train = subset(data, split == TRUE)
+data.test = subset(data, split == FALSE)
+```
+
+## Common Functions
+```{r}
+plot.diagnostics <-  function(model, train) {
+  plot(model)
+  
+  residuals = resid(model) # Plotted above in plot(lm.out)
+  r.standard = rstandard(model)
+  r.student = rstudent(model)
+
+  plot(predict(model,train),r.student,
+      ylab="Student Residuals", xlab="Predicted Values", 
+      main="Student Residual Plot") 
+  abline(0, 0)
+  
+  plot(predict(model, train),r.standard,
+      ylab="Standard Residuals", xlab="Predicted Values", 
+      main="Standard Residual Plot") 
+  abline(0, 0)
+  abline(2, 0)
+  abline(-2, 0)
+  
+  # Histogram
+  hist(r.student, freq=FALSE, main="Distribution of Studentized Residuals", 
+  xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+
+  # Create range of x-values for normal curve
+  xfit <- seq(min(r.student)-1, max(r.student)+1, length=40)
+
+  # Generate values from the normal distribution at the specified values
+  yfit <- (dnorm(xfit))
+
+  # Add the normal curve
+  lines(xfit, yfit, ylim=c(0,0.5))
+  
+}
+```
+
+## Setup Formulae
+```{r}
+n <- names(data.train)
+formula <- as.formula(paste(paste(n[n %in% label.names], collapse = " + ")," ~", paste(n[!n %in% label.names], collapse = " + "))) 
+grand.mean.formula = as.formula(paste(paste(n[n %in% label.names], collapse = " + ")," ~ 1"))
+print(formula)
+print(grand.mean.formula)
+
+# Update feature.names because we may have transformed some features
+feature.names = n[!n %in% label.names]
+```
+
+## Full & Grand Means Model
+
+```{r Full Model}
+model.full = lm(formula , data.train)
+summary(model.full)
+plot.diagnostics(model.full, data.train)
 ```
 
 ```{r}
-stepAIC(model, direction = "both", trace = FALSE) #$anova
+model.null = lm(grand.mean.formula, data.train)
+summary(model.null)
+plot.diagnostics(model.null, data.train)
+```
+
+
+## Variable Selection 
+http://www.stat.columbia.edu/~martin/W2024/R10.pdf 
+
+### Forward Selection
+
+```{r Forward Selection}
+if (algo.forward == TRUE){
+  t1 = Sys.time()
+  
+  model.forward = step(model.null, scope=list(lower=model.null, upper=model.full), direction="forward")
+  print(summary(model.forward))
+  saveRDS(model.forward,file = "model_forward.rds")
+  
+  t2 = Sys.time()
+  print (paste("Time taken for Forward Selection: ",t2-t1, sep = ""))
+  
+  plot.diagnostics(model.forward, data.train)
+  
+}
+```
+
+### Backward Elimination
+```{r Backward Elimination}
+if (algo.backward == TRUE){
+  # Takes too much time
+  t1 = Sys.time()
+  
+  model.backward = step(model.full, data = data.train, direction="backward")
+  print(summary(model.backward))
+  saveRDS(model.forward,file = "model_backward.rds")
+  
+  t2 = Sys.time()
+  print (paste("Time taken for Backward Elimination: ",t2-t1, sep = ""))
+  
+  plot.diagnostics(model.backward, data.train)
+}
+```
+
+### Stepwise Selection
+```{r Stepwise Selection}
+if (algo.stepwise == TRUE){
+  t1 = Sys.time()
+  
+  model.stepwise = step(model.null, scope=list(upper=model.full), data = data.train, direction="both")
+  print(summary(model.stepwise))
+  saveRDS(model.forward,file = "model_stepwise.rds")
+  
+  t2 = Sys.time()
+  print (paste("Time taken for Stepwise Selection: ",t2-t1, sep = ""))
+  
+  plot.diagnostics(model.stepwise, data.train)
+}
+```
+
+### LASSO Selection
+```{r LASSO}
+if (algo.LASSO == TRUE){
+  t1 = Sys.time()
+
+  model.LASSO = cv.glmnet(as.matrix(data.train[,feature.names]), data.train[,label.names], nfolds = 5, standardize = TRUE)  
+  summary(model.LASSO)
+  
+  t2 = Sys.time()
+  print (paste("Time taken for LASSO: ",t2-t1, sep = ""))
+  
+  plot(model.LASSO)
+  best_lambda = model.LASSO$lambda.1se
+  lasso_coef = model.LASSO$glmnet.fit$beta[ , model.LASSO$glmnet.fit$lambda == best_lambda]
+  print (lasso_coef)
+  lasso_coef [ abs(lasso_coef) > 0 ]
+}
 ```
 
 ```{r}
-
+# summary(model.forward)
+# summary(model.stepwise)
 ```
+
+
+

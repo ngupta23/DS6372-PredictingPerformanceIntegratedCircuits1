@@ -1,0 +1,4 @@
+"0","if (eda == TRUE){"
+"0","  corr.to.label =round(cor(dplyr::select(data,-one_of(label.names)),dplyr::select_at(data,label.names)),4)"
+"0","  DT::datatable(corr.to.label)"
+"0","}"

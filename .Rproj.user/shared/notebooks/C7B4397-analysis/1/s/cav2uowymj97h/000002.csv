@@ -1,0 +1,4 @@
+"0","data <- merge(features, labels, by = 'JobName')"
+"0","drops <- c('JobName')"
+"0","data = data[,(!colnames(data) %in% drops)]"
+"0","#str(data)"
