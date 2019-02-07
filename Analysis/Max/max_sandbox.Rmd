@@ -15,7 +15,11 @@ library(usdm) #for multicollinearity
 library(tidyverse)
 library(ggplot2)
 library(PerformanceAnalytics)
-
+library(MASS)
+library(glmnet)
+library(investr)
+library(ggiraph)
+library(ggiraphExtra) #https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html
 
 ```
 
@@ -118,3 +122,69 @@ head(vifDF,10)
 ```
 
  
+# Feature Eng
+
+- No trasnformation for x18
+
+- log transformatio for y3
+
+```{r}
+df=data.complete %>%
+  mutate(x18sqrt = sqrt(x18)
+         ,y3log = log(y3)
+         ) 
+
+ggplot(gather(select_at(df,c('y3','y3log','x18','x18sqrt'))), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+df=df %>%
+  select(-x18sqrt,-y3)
+```
+
+
+# Model
+
+## Train & Test
+
+```{r}
+df.train = df %>% sample_frac(.70)
+df.test = df %>% anti_join(df, df.train, by = 'JobName')
+
+```
+
+
+## LM model
+
+```{r}
+fit.lm = lm(data=select(df.train,-JobName), formula = y3log ~ .)
+summary(fit.lm)
+
+#http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/ 
+fit.lm.AIC=MASS::stepAIC(fit.lm,direction='both')
+summary(fit.lm.AIC)
+anova(fit.lm.AIC)
+MSD=Metrics::mse(df$y3log,predict(model,df))
+mse(actual, predicted)
+
+plot(model, which=c(1:3))
+stud <- rstudent(model)
+
+hist(stud, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+
+plot(predict(model,data),resid(model))
+investr::plotFit(model,data=df,interval=c('both'),level=0.95, extend.range=T,shade=T)
+
+
+ggPredict(model,interactive = FALSE)
+```
+
+## Residuals
+
+```{r}
+res=resid(model)
+plot(df$y13log,  res)
+```
+
