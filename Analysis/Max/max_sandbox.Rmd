@@ -210,8 +210,8 @@ lambdaID=which(fit.lm.lasso$glmnet.fit$lambda==lambda)
 
 #rsq http://myweb.uiowa.edu/pbreheny/7600/s16/notes/2-22.pdf 
 r2s = 1 - fit.lm.lasso$cvm/var(df.train[,target])
-print("Lambda: ",lambda)
-print("R2: ",r2s[lambdaID])
+message("Lambda: ",lambda)
+message("R2: ",r2s[lambdaID])
 plot(fit.lm.lasso$lambda,r2s)
 
 #deviation
@@ -222,7 +222,7 @@ fit.lm.lasso$glmnet.fit$dev.ratio[lambdaID]
 pred = glmnet::predict.cv.glmnet(fit.lm.lasso,s='lambda.1se',newx=as.matrix(df.train[,predictors]))#, type = 'coefficients')
 
 MSE=Metrics::mse(df.train$y3log,pred)
-print("MSE ",MSE)
+message("MSE ",MSE)
 plot(pred,resid(fit.lm.lasso))
 
 plot(fit.lm.lasso)
