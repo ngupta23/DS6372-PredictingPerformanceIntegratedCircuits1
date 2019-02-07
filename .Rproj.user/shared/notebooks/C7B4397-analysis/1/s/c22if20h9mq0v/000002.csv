@@ -1,4 +1,0 @@
-"0","if (eda == TRUE){"
-"0","  vifDF = usdm::vif(select_at(data,feature.names)) %>% arrange(desc(VIF))"
-"0","  head(vifDF,10)"
-"0","}"

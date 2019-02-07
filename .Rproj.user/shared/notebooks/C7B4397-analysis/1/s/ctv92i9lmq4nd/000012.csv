@@ -1,8 +1,0 @@
-"0","corr.matrix = round(cor(features[sapply(features, is.numeric)]),2)"
-"0","# filter out only highly correlated variables"
-"0","threshold = 0.6"
-"0","corr.matrix.tmp = corr.matrix"
-"0","diag(corr.matrix.tmp) = 0"
-"0","high.corr = apply(abs(corr.matrix.tmp) >= threshold, 1, any)"
-"0","high.corr.matrix = corr.matrix.tmp[high.corr, high.corr]"
-"0","DT::datatable(corr.matrix)"
