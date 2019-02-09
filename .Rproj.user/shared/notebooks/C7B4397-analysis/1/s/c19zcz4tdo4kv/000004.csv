@@ -1,0 +1,4 @@
+"0","if (eda == TRUE){"
+"0","  histogram(data[ ,label.names])"
+"0","  #hist(data[complete.cases(data),alt.scale.label.name])"
+"0","}"

@@ -2,80 +2,80 @@
 "0","formula <- as.formula(paste(paste(n[n %in% label.names], collapse = "" + ""),"" ~"", paste(n[!n %in% label.names], collapse = "" + ""))) "
 "0","grand.mean.formula = as.formula(paste(paste(n[n %in% label.names], collapse = "" + ""),"" ~ 1""))"
 "0","print(formula)"
-"1","log.y3 ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + 
+"1","y3 ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + x11 + 
 "
-"1","    x12 + x13 + x14 + x15 + x16 + x17 + x19 + x20 + x21 + x22 + 
+"1","    x12 + x13 + x14 + x15 + x16 + x17 + x18 + x19 + x20 + x21 + 
 "
-"1","    x23 + stat1 + stat2 + stat3 + stat4 + stat5 + stat6 + stat7 + 
+"1","    x22 + x23 + stat1 + stat2 + stat3 + stat4 + stat5 + stat6 + 
 "
-"1","    stat8 + stat9 + stat10 + stat11 + stat12 + stat13 + stat14 + 
+"1","    stat7 + stat8 + stat9 + stat10 + stat11 + stat12 + stat13 + 
 "
-"1","    stat15 + stat16 + stat17 + stat18 + stat19 + stat20 + stat21 + 
+"1","    stat14 + stat15 + stat16 + stat17 + stat18 + stat19 + stat20 + 
 "
-"1","    stat22 + stat23 + stat24 + stat25 + stat26 + stat27 + stat28 + 
+"1","    stat21 + stat22 + stat23 + stat24 + stat25 + stat26 + stat27 + 
 "
-"1","    stat29 + stat30 + stat31 + stat32 + stat33 + stat34 + stat35 + 
+"1","    stat28 + stat29 + stat30 + stat31 + stat32 + stat33 + stat34 + 
 "
-"1","    stat36 + stat37 + stat38 + stat39 + stat40 + stat41 + stat42 + 
+"1","    stat35 + stat36 + stat37 + stat38 + stat39 + stat40 + stat41 + 
 "
-"1","    stat43 + stat44 + stat45 + stat46 + stat47 + stat48 + stat49 + 
+"1","    stat42 + stat43 + stat44 + stat45 + stat46 + stat47 + stat48 + 
 "
-"1","    stat50 + stat51 + stat52 + stat53 + stat54 + stat55 + stat56 + 
+"1","    stat49 + stat50 + stat51 + stat52 + stat53 + stat54 + stat55 + 
 "
-"1","    stat57 + stat58 + stat59 + stat60 + stat61 + stat62 + stat63 + 
+"1","    stat56 + stat57 + stat58 + stat59 + stat60 + stat61 + stat62 + 
 "
-"1","    stat64 + stat65 + stat66 + stat67 + stat68 + stat69 + stat70 + 
+"1","    stat63 + stat64 + stat65 + stat66 + stat67 + stat68 + stat69 + 
 "
-"1","    stat71 + stat72 + stat73 + stat74 + stat75 + stat76 + stat77 + 
+"1","    stat70 + stat71 + stat72 + stat73 + stat74 + stat75 + stat76 + 
 "
-"1","    stat78 + stat79 + stat80 + stat81 + stat82 + stat83 + stat84 + 
+"1","    stat77 + stat78 + stat79 + stat80 + stat81 + stat82 + stat83 + 
 "
-"1","    stat85 + stat86 + stat87 + stat88 + stat89 + stat90 + stat91 + 
+"1","    stat84 + stat85 + stat86 + stat87 + stat88 + stat89 + stat90 + 
 "
-"1","    stat92 + stat93 + stat94 + stat95 + stat96 + stat97 + stat98 + 
+"1","    stat91 + stat92 + stat93 + stat94 + stat95 + stat96 + stat97 + 
 "
-"1","    stat99 + stat100 + stat101 + stat102 + stat103 + stat104 + 
+"1","    stat98 + stat99 + stat100 + stat101 + stat102 + stat103 + 
 "
-"1","    stat105 + stat106 + stat107 + stat108 + stat109 + stat110 + 
+"1","    stat104 + stat105 + stat106 + stat107 + stat108 + stat109 + 
 "
-"1","    stat111 + stat112 + stat113 + stat114 + stat115 + stat116 + 
+"1","    stat110 + stat111 + stat112 + stat113 + stat114 + stat115 + 
 "
-"1","    stat117 + stat118 + stat119 + stat120 + stat121 + stat122 + 
+"1","    stat116 + stat117 + stat118 + stat119 + stat120 + stat121 + 
 "
-"1","    stat123 + stat124 + stat125 + stat126 + stat127 + stat128 + 
+"1","    stat122 + stat123 + stat124 + stat125 + stat126 + stat127 + 
 "
-"1","    stat129 + stat130 + stat131 + stat132 + stat133 + stat134 + 
+"1","    stat128 + stat129 + stat130 + stat131 + stat132 + stat133 + 
 "
-"1","    stat135 + stat136 + stat137 + stat138 + stat139 + stat140 + 
+"1","    stat134 + stat135 + stat136 + stat137 + stat138 + stat139 + 
 "
-"1","    stat141 + stat142 + stat143 + stat144 + stat145 + stat146 + 
+"1","    stat140 + stat141 + stat142 + stat143 + stat144 + stat145 + 
 "
-"1","    stat147 + stat148 + stat149 + stat150 + stat151 + stat152 + 
+"1","    stat146 + stat147 + stat148 + stat149 + stat150 + stat151 + 
 "
-"1","    stat153 + stat154 + stat155 + stat156 + stat157 + stat158 + 
+"1","    stat152 + stat153 + stat154 + stat155 + stat156 + stat157 + 
 "
-"1","    stat159 + stat160 + stat161 + stat162 + stat163 + stat164 + 
+"1","    stat158 + stat159 + stat160 + stat161 + stat162 + stat163 + 
 "
-"1","    stat165 + stat166 + stat167 + stat168 + stat169 + stat170 + 
+"1","    stat164 + stat165 + stat166 + stat167 + stat168 + stat169 + 
 "
-"1","    stat171 + stat172 + stat173 + stat174 + stat175 + stat176 + 
+"1","    stat170 + stat171 + stat172 + stat173 + stat174 + stat175 + 
 "
-"1","    stat177 + stat178 + stat179 + stat180 + stat181 + stat182 + 
+"1","    stat176 + stat177 + stat178 + stat179 + stat180 + stat181 + 
 "
-"1","    stat183 + stat184 + stat185 + stat186 + stat187 + stat188 + 
+"1","    stat182 + stat183 + stat184 + stat185 + stat186 + stat187 + 
 "
-"1","    stat189 + stat190 + stat191 + stat192 + stat193 + stat194 + 
+"1","    stat188 + stat189 + stat190 + stat191 + stat192 + stat193 + 
 "
-"1","    stat195 + stat196 + stat197 + stat198 + stat199 + stat200 + 
+"1","    stat194 + stat195 + stat196 + stat197 + stat198 + stat199 + 
 "
-"1","    stat201 + stat202 + stat203 + stat204 + stat205 + stat206 + 
+"1","    stat200 + stat201 + stat202 + stat203 + stat204 + stat205 + 
 "
-"1","    stat207 + stat208 + stat209 + stat210 + stat211 + stat212 + 
+"1","    stat206 + stat207 + stat208 + stat209 + stat210 + stat211 + 
 "
-"1","    stat213 + stat214 + stat215 + stat216 + stat217 + sqrt.x18
+"1","    stat212 + stat213 + stat214 + stat215 + stat216 + stat217
 "
 "0","print(grand.mean.formula)"
-"1","log.y3 ~ 1
+"1","y3 ~ 1
 "
 "0","# Update feature.names because we may have transformed some features"
 "0","feature.names = n[!n %in% label.names]"
