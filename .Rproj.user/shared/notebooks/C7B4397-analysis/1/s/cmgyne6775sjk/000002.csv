@@ -1,4 +1,0 @@
-"0","data = data[sample(nrow(data)),] # randomly shuffle data"
-"0","split = sample.split(data[,label.names], SplitRatio = 0.8)"
-"0","data.train = subset(data, split == TRUE)"
-"0","data.test = subset(data, split == FALSE)"
