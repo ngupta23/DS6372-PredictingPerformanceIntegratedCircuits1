@@ -9,12 +9,13 @@ output:
    toc_depth: 3
 params:
   output.var: 'y3'
+  transform.abs: FALSE
   log.pred: FALSE
-  eda: TRUE
+  eda: FALSE
   algo.forward: FALSE
   algo.backward: FALSE
   algo.stepwise: FALSE
-  algo.LASSO: FALSE
+  algo.LASSO: TRUE
   algo.LARS: FALSE
 ---
 
@@ -54,7 +55,8 @@ library(glmnet)
 
 # User Inputs
 ```{r User Inputs}
-output.var = params$output.var
+output.var = params$output.var 
+transform.abs = params$transform.abs
 log.pred = params$log.pred
 eda = params$eda
 algo.forward = params$algo.forward
@@ -133,7 +135,13 @@ data = data[,(!colnames(data) %in% drops)]
 ```
 
 ## Transformations
-```{r}
+```{r Transformations}
+if (transform.abs == TRUE){
+  data[,label.names] = 10^(data[,label.names]/20)
+  data = filter(data, y3 < 1E7)
+}
+
+
 #str(data)
 if (log.pred == TRUE){
   data[label.names] = log(data[alt.scale.label.name],10)
@@ -148,6 +156,8 @@ if (log.pred == TRUE){
 ```{r}
 data = data[complete.cases(data),]
 ```
+
+# Exploratory Data Analysis
 
 ## Check correlation of Label with Featires
 ```{r Correlation of features to label}
@@ -165,9 +175,6 @@ if (eda == TRUE){
 }
 ```
 
-
-# Exploratory Data Analysis
-
 ## Scatterplots
 ```{r}
 panel.hist <- function(x, ...)
@@ -181,14 +188,14 @@ panel.hist <- function(x, ...)
 }
 ```
 
-```{r}
+```{r Histogram}
 if (eda == TRUE){
-  hist(data[ ,label.names])
+  histogram(data[ ,label.names])
   #hist(data[complete.cases(data),alt.scale.label.name])
 }
 ```
 
-```{r}
+```{r Scatterplots}
 # https://stackoverflow.com/questions/24648729/plot-one-numeric-variable-against-n-numeric-variables-in-n-plots
 ind.pairs.plot <- function(data, xvars=NULL, yvar)
 {
@@ -208,6 +215,12 @@ ind.pairs.plot <- function(data, xvars=NULL, yvar)
 if (eda == TRUE){
   ind.pairs.plot(data, feature.names, label.names)
 }
+
+
+# 
+# pl <- ggplot(data, aes(x=x18, y = y3))
+# pl2 <- pl + geom_point(aes(alpha = 0.1)) # default color gradient based on 'hp'
+# print(pl2)
 
 ```
 
@@ -276,6 +289,26 @@ plot.diagnostics <-  function(model, train) {
   # Add the normal curve
   lines(xfit, yfit, ylim=c(0,0.5))
   
+  
+  # http://www.stat.columbia.edu/~martin/W2024/R7.pdf
+  # Influential plots
+  inf.meas = influence.measures(model)
+  print (summary(inf.meas))
+  
+  # Leverage plot
+  # Influential plots
+  lev = hat(model.matrix(model))
+  plot(lev, ylab = 'Leverage - check')
+  
+  # Cook's Distance
+  cd = cooks.distance(model)
+  plot(cd,ylab="Cooks distances")
+  abline(4/nrow(train),0)
+  abline(1,0)
+  
+  print (paste("Number of data points that have Cook's D > 4/n: ", length(cd[cd > 4/nrow(train)]), sep = "")) 
+  print (paste("Number of data points that have Cook's D > 1: ", length(cd[cd > 1]), sep = "")) 
+  return(cd)
 }
 ```
 
@@ -295,8 +328,20 @@ feature.names = n[!n %in% label.names]
 
 ```{r Full Model}
 model.full = lm(formula , data.train)
-summary(model.full)
-plot.diagnostics(model.full, data.train)
+#summary(model.full)
+cd.full = plot.diagnostics(model.full, data.train)
+```
+
+## Just trial removing all high influence points
+```{r}
+high.cd = names(cd.full[cd.full > 4/nrow(data.train)])
+data.train2 = data.train[!(rownames(data.train)) %in% high.cd,]
+model.full2 = lm(formula , data.train2)
+summary(model.full2)
+cd.full2 = plot.diagnostics(model.full2, data.train2)
+
+# much more normal residuals than before. 
+# See if you can check the distribution (boxplots) of the high leverage points and the other points
 ```
 
 ```{r}
@@ -362,22 +407,120 @@ if (algo.stepwise == TRUE){
 
 ### LASSO Selection
 ```{r LASSO}
-if (algo.LASSO == TRUE){
-  t1 = Sys.time()
-
-  model.LASSO = cv.glmnet(as.matrix(data.train[,feature.names]), data.train[,label.names], nfolds = 5, standardize = TRUE)  
-  summary(model.LASSO)
-  
-  t2 = Sys.time()
-  print (paste("Time taken for LASSO: ",t2-t1, sep = ""))
-  
-  plot(model.LASSO)
-  best_lambda = model.LASSO$lambda.1se
-  lasso_coef = model.LASSO$glmnet.fit$beta[ , model.LASSO$glmnet.fit$lambda == best_lambda]
-  print (lasso_coef)
-  lasso_coef [ abs(lasso_coef) > 0 ]
-}
+# if (algo.LASSO == TRUE){
+#   t1 = Sys.time()
+# 
+#   model.LASSO = cv.glmnet(as.matrix(data.train[,feature.names]), data.train[,label.names], nfolds = 5, standardize = TRUE)  
+#   summary(model.LASSO)
+#   
+#   t2 = Sys.time()
+#   print (paste("Time taken for LASSO: ",t2-t1, sep = ""))
+#   
+#   plot(model.LASSO)
+#   best_lambda = model.LASSO$lambda.1se
+#   lasso_coef = model.LASSO$glmnet.fit$beta[ , model.LASSO$glmnet.fit$lambda == best_lambda]
+#   print (lasso_coef)
+#   lasso_coef [ abs(lasso_coef) > 0 ]
+# }
 ```
+
+### LASSO (w/ full train)
+
+```{r LASSO With full}
+if(algo.LASSO == TRUE){
+  # Formatting data for GLM net
+  # you can use model.matrix as well -- model.matrix creates a design (or model) matrix, 
+  # e.g., by expanding factors to a set of dummy variables (depending on the contrasts) 
+  # and expanding interactions similarly.
+  x = as.matrix(data.train[,feature.names])
+  y = data.train[,label.names]
+  
+  xtest = as.matrix(data.test[,feature.names]) 
+  ytest = data.test[,label.names] 
+  
+  grid=10^seq(10,-2, length =100)
+  model.LASSO=glmnet(x,y,alpha=1, lambda =grid)
+  
+  cv.out=cv.glmnet(x,y,alpha=1) # alpha=1 performs LASSO
+  plot(cv.out)
+  bestlambda<-cv.out$lambda.min  # Optimal penalty parameter.  You can make this call visually.
+  lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)
+  
+  testMSE_LASSO = mean((ytest-lasso.pred)^2)
+  print (paste("LASSO Test RMSE: ",testMSE_LASSO, sep=""))
+  
+  print(coef(model.LASSO,s=bestlambda))
+  
+  plot(ytest,lasso.pred)
+  
+}
+
+```
+
+### LASSO (w/ filtered train)
+```{r LASSO with high Cooks D filtered}
+if(algo.LASSO == TRUE){
+  # Formatting data for GLM net
+  # you can use model.matrix as well -- model.matrix creates a design (or model) matrix, 
+  # e.g., by expanding factors to a set of dummy variables (depending on the contrasts) 
+  # and expanding interactions similarly.
+  x = as.matrix(data.train2[,feature.names])
+  y = data.train2[,label.names]
+  
+  xtest = as.matrix(data.test[,feature.names]) 
+  ytest = data.test[,label.names] 
+  
+  grid=10^seq(10,-2, length =100)
+  model.LASSO=glmnet(x,y,alpha=1, lambda =grid)
+  
+  cv.out=cv.glmnet(x,y,alpha=1) # alpha=1 performs LASSO
+  plot(cv.out)
+  bestlambda<-cv.out$lambda.min  # Optimal penalty parameter.  You can make this call visually.
+  lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)
+  
+  testMSE_LASSO = mean((ytest-lasso.pred)^2)
+  print (paste("LASSO Test RMSE: ",testMSE_LASSO, sep=""))
+  
+  print(coef(model.LASSO,s=bestlambda))
+  
+  plot(ytest,lasso.pred)
+
+}
+
+```
+
+
+##LASSO calls
+Peforming a lasos call is pretty straight forward.  GLM-NET peforms 10-fold CV to determine an optimal penalty parameter.  
+The coefficients are easy to extract and making predictions are straight forward.  It is possible to make ASE style plots like we did previously but it takes a little extra programming. See me if interested.
+
+```{r eval=FALSE, include=FALSE, echo=T}
+library(glmnet)
+#Formatting data for GLM net
+x=model.matrix(AvgWinnings~.,train)[,-1] 
+y=log(train$AvgWinnings)
+
+xtest<-model.matrix(AvgWinnings~.,test)[,-1]
+ytest<-log(test$AvgWinnings)
+
+grid=10^seq(10,-2, length =100)
+lasso.mod=glmnet(x,y,alpha=1, lambda =grid)
+
+cv.out=cv.glmnet(x,y,alpha=1) #alpha=1 performs LASSO
+plot(cv.out)
+bestlambda<-cv.out$lambda.min  #Optimal penalty parameter.  You can make this call visually.
+lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
+
+testMSE_LASSO<-mean((ytest-lasso.pred)^2)
+testMSE_LASSO
+```
+
+
+```{r eval=FALSE, include=FALSE, echo=T}
+coef(lasso.mod,s=bestlambda)
+```
+
+
 
 ```{r}
 # summary(model.forward)
