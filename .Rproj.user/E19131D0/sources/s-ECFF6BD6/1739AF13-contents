@@ -6,7 +6,7 @@ output:
  html_document:
    toc: true
    toc_float: true
-   toc_depth: 3
+   toc_depth: 5
 params:
   output.var: 'y3'
   transform.abs: FALSE
@@ -15,8 +15,14 @@ params:
   algo.forward: FALSE
   algo.backward: FALSE
   algo.stepwise: FALSE
-  algo.LASSO: TRUE
+  algo.LASSO: FALSE
   algo.LARS: FALSE
+  
+  algo.forward.caret: TRUE
+  algo.backward.caret: FALSE
+  algo.stepwise.caret: FALSE
+  algo.LASSO.caret: FALSE
+  algo.LARS.caret: FALSE
 ---
 
 ```{r setup, include=FALSE}
@@ -38,7 +44,7 @@ check.packages <- function(pkg){
 }
 
 # Usage example
-packages<-c("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet")
+packages<-c("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps")
 check.packages(packages)
 
 library(dplyr)
@@ -51,6 +57,8 @@ library(ggplot2)
 library(PerformanceAnalytics)
 library(caTools)
 library(glmnet)
+library(caret)
+library(leaps)
 ```
 
 # User Inputs
@@ -64,6 +72,12 @@ algo.backward = params$algo.backward
 algo.stepwise = params$algo.stepwise
 algo.LASSO = params$algo.LASSO
 algo.LARS = params$algo.LARS
+  
+algo.forward.caret = params$algo.forward.caret
+algo.backward.caret = params$algo.backward.caret
+algo.stepwise.caret = params$algo.stepwise.caret
+algo.LASSO.caret = params$algo.LASSO.caret
+algo.LARS.caret = params$algo.LARS.caret
 
 message("Parameters used for training/prediction: ")
 str(params)
@@ -293,10 +307,9 @@ plot.diagnostics <-  function(model, train) {
   # http://www.stat.columbia.edu/~martin/W2024/R7.pdf
   # Influential plots
   inf.meas = influence.measures(model)
-  print (summary(inf.meas))
+  # print (summary(inf.meas)) # too much data
   
   # Leverage plot
-  # Influential plots
   lev = hat(model.matrix(model))
   plot(lev, ylab = 'Leverage - check')
   
@@ -310,6 +323,39 @@ plot.diagnostics <-  function(model, train) {
   print (paste("Number of data points that have Cook's D > 1: ", length(cd[cd > 1]), sep = "")) 
   return(cd)
 }
+
+# https://stackoverflow.com/questions/48265743/linear-model-subset-selection-goodness-of-fit-with-k-fold-cross-validation
+# changes slightly since call[[2]] was just returning "formula" without actually returnign the value in formula
+predict.regsubsets <- function(object, newdata, id, formula, ...) {
+    #form <- as.formula(object$call[[2]])
+    mat <- model.matrix(formula, newdata) # adds intercept and expands any interaction terms
+    coefi <- coef(object, id = id)
+    xvars <- names(coefi)
+    return(mat[,xvars]%*%coefi)
+}
+  
+test.model = function(model, test, type = 'No Model Name Specified', level = 0.95, regsubset = FALSE, id, formula){
+  ## if using caret for glm select equivalent functionality, 
+  ## need to set regsubset = TRUE, pass id of best model through id variable, 
+  ## and pass formula (full is ok as it will select subset of variables from there)
+  if (regsubset == FALSE){
+    pred = predict(model, newdata=test, interval="confidence", level = level) 
+  }
+  
+  if (regsubset == TRUE){
+    pred = predict.regsubsets(model, newdata = test, id = id, formula = formula)
+  }
+  
+  # Summary of predicted values
+  print ("Summary of predicted values: ")
+  print(summary(pred[,1]))
+  
+  test.mse = mean((test[,label.names]-pred[,1])^2)
+  print (paste(type, " Test MSE: ", test.mse, sep=""))
+  
+  plot(test[,label.names],pred[,1],xlab = "Actual", ylab = "Predicted")
+}
+
 ```
 
 ## Setup Formulae
@@ -328,7 +374,7 @@ feature.names = n[!n %in% label.names]
 
 ```{r Full Model}
 model.full = lm(formula , data.train)
-#summary(model.full)
+summary(model.full)
 cd.full = plot.diagnostics(model.full, data.train)
 ```
 
@@ -350,37 +396,206 @@ summary(model.null)
 plot.diagnostics(model.null, data.train)
 ```
 
-
+```{r}
+model.null2 = lm(grand.mean.formula, data.train2)
+summary(model.null2)
+plot.diagnostics(model.null2, data.train2)
+```
 ## Variable Selection 
 http://www.stat.columbia.edu/~martin/W2024/R10.pdf 
 
-### Forward Selection
+TODO: 
+Cross Validation + Other Metrics: http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/
 
+### Forward Selection (w/ full train)
+
+#### Train
 ```{r Forward Selection}
 if (algo.forward == TRUE){
   t1 = Sys.time()
   
-  model.forward = step(model.null, scope=list(lower=model.null, upper=model.full), direction="forward")
+  model.forward = step(model.null, scope=list(lower=model.null, upper=model.full), direction="forward", trace = 0)
   print(summary(model.forward))
-  saveRDS(model.forward,file = "model_forward.rds")
+  #saveRDS(model.forward,file = "model_forward.rds")
   
   t2 = Sys.time()
   print (paste("Time taken for Forward Selection: ",t2-t1, sep = ""))
   
   plot.diagnostics(model.forward, data.train)
+}
+```
+
+#### Test
+```{r}
+if (algo.forward == TRUE){
+  test.model(model.forward, data.test, "Forward Selection")
+}
+```
+
+### Forward Selection (w/ filtered train)
+
+#### Train
+```{r Forward Selection with Filtered}
+if (algo.forward == TRUE){
+  t1 = Sys.time()
   
+  model.forward2 = step(model.null2, scope=list(lower=model.null2, upper=model.full2), direction="forward", trace = 0)
+  print(summary(model.forward2))
+  #saveRDS(model.forward,file = "model_forward.rds")
+  
+  t2 = Sys.time()
+  print (paste("Time taken for Forward Selection: ",t2-t1, sep = ""))
+  
+  plot.diagnostics(model.forward2, data.train2)
+}
+```
+
+#### Test
+```{r}
+if (algo.forward == TRUE){
+  test.model(model.forward2, data.test, "Forward Selection (2)")
+}
+```
+
+
+### Forward Selection with Caret (w/ full train)# http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/
+
+#### Common Functions
+```{r}
+train.caret.glmselect = function(formula, data, method, feature.names, train.control = NULL){
+  
+  if(is.null(train.control)){
+    train.control <- trainControl(method = "cv"
+                              ,number = 10
+                              ,search = "grid"
+                              ,verboseIter = TRUE
+                              )
+  }
+  
+  set.seed(1)
+  model.caret <- caret::train(formula
+                              , data = data
+                              , method = method
+                              , tuneGrid = data.frame(nvmax = 1:length(feature.names))
+                              , trControl = train.control
+                              )
+  
+  print(model.caret$results) # all model results
+  print(model.caret$bestTune) # best model
+  
+  model = model.caret$finalModel
+  
+  # Provides the coefficients of the best model
+  id = rownames(model.caret$bestTune)
+  message("Coefficients of final model:")
+  print (coef(model, id = id))
+  
+  # Need to find alternate to plotting diagnostic plots
+  # plot.diagnostics(model.forward,data.train)
+  # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
+  return(list(model = model,id = id))
+}
+```
+
+#### Train
+```{r}
+if (algo.forward.caret == TRUE){
+  # train.control <- trainControl(method = "cv"
+  #                             ,number = 10
+  #                             ,search = "grid"
+  #                             ,verboseIter = TRUE
+  #                             )
+  # 
+  # set.seed(1)
+  # model.forward.caret <- caret::train(formula
+  #                                   , data = data.train
+  #                                   , method = "leapForward"
+  #                                   , tuneGrid = data.frame(nvmax = 1:length(feature.names))
+  #                                  , trControl = train.control
+  #                             )
+  # 
+  # print(model.forward.caret$results) # all model results
+  # print(model.forward.caret$bestTune) # best model
+  # 
+  # model.forward = model.forward.caret$finalModel
+  # 
+  # # Provides the coefficients of the best model
+  # id = rownames(model.forward.caret$bestTune)
+  # coef(model.forward, id = id)
+  # 
+  # # Need to find alternate to plotting diagnostic plots
+  # # plot.diagnostics(model.forward,data.train)
+  # # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
+  
+  returned = train.caret.glmselect(formula, data.train, "leapForward", feature.names)
+  model.forward = returned$model
+  id = returned$id
+}
+```
+
+#### Test
+```{r}
+if (algo.forward.caret == TRUE){
+  test.model(model.forward, data.test, "Forward Selection", regsubset = TRUE, id = id, formula = formula)
+}
+```
+
+### Forward Selection with Caret (w/ filtered train)
+
+#### Train
+```{r}
+if (algo.forward.caret == TRUE){
+  # train.control <- trainControl(method = "cv"
+  #                             ,number = 10
+  #                             ,search = "grid"
+  #                             ,verboseIter = TRUE
+  #                             )
+  # 
+  # set.seed(1)
+  # model.forward.caret <- caret::train(formula
+  #                                   , data = data.train2
+  #                                   , method = "leapForward"
+  #                                   , tuneGrid = data.frame(nvmax = 1:length(feature.names))
+  #                                  , trControl = train.control
+  #                             )
+  # 
+  # print(model.forward.caret$results) # all model results
+  # print(model.forward.caret$bestTune) # best model
+  # 
+  # model.forward = model.forward.caret$finalModel
+  # 
+  # # Provides the coefficients of the best model
+  # id = rownames(model.forward.caret$bestTune)
+  # coef(model.forward, id = id)
+  # 
+  # # Need to find alternate to plotting diagnostic plots
+  # # plot.diagnostics(model.forward,data.train)
+  # # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
+  
+  returned = train.caret.glmselect(formula, data.train2, "leapForward", feature.names)
+  model.forward = returned$model
+  id = returned$id
+}
+```
+
+#### Test
+```{r}
+if (algo.forward.caret == TRUE){
+  test.model(model.forward, data.test, "Forward Selection (2)", regsubset = TRUE, id = id, formula = formula)
 }
 ```
 
 ### Backward Elimination
+
+#### Train
 ```{r Backward Elimination}
 if (algo.backward == TRUE){
   # Takes too much time
   t1 = Sys.time()
   
-  model.backward = step(model.full, data = data.train, direction="backward")
+  model.backward = step(model.full, data = data.train, direction="backward", trace = 0)
   print(summary(model.backward))
-  saveRDS(model.forward,file = "model_backward.rds")
+  #saveRDS(model.forward,file = "model_backward.rds")
   
   t2 = Sys.time()
   print (paste("Time taken for Backward Elimination: ",t2-t1, sep = ""))
@@ -389,14 +604,23 @@ if (algo.backward == TRUE){
 }
 ```
 
-### Stepwise Selection
+#### Test
+```{r}
+if (algo.backward == TRUE){
+  test.model(model.backard, data.test, "Backward Elimination")
+}
+```
+
+### Stepwise Selection (w/ full train)
+
+#### Train
 ```{r Stepwise Selection}
 if (algo.stepwise == TRUE){
   t1 = Sys.time()
   
-  model.stepwise = step(model.null, scope=list(upper=model.full), data = data.train, direction="both")
+  model.stepwise = step(model.null, scope=list(upper=model.full), data = data.train, direction="both", trace = 0)
   print(summary(model.stepwise))
-  saveRDS(model.forward,file = "model_stepwise.rds")
+  #saveRDS(model.stepwise,file = "model_stepwise.rds")
   
   t2 = Sys.time()
   print (paste("Time taken for Stepwise Selection: ",t2-t1, sep = ""))
@@ -405,27 +629,124 @@ if (algo.stepwise == TRUE){
 }
 ```
 
-### LASSO Selection
-```{r LASSO}
-# if (algo.LASSO == TRUE){
-#   t1 = Sys.time()
-# 
-#   model.LASSO = cv.glmnet(as.matrix(data.train[,feature.names]), data.train[,label.names], nfolds = 5, standardize = TRUE)  
-#   summary(model.LASSO)
-#   
-#   t2 = Sys.time()
-#   print (paste("Time taken for LASSO: ",t2-t1, sep = ""))
-#   
-#   plot(model.LASSO)
-#   best_lambda = model.LASSO$lambda.1se
-#   lasso_coef = model.LASSO$glmnet.fit$beta[ , model.LASSO$glmnet.fit$lambda == best_lambda]
-#   print (lasso_coef)
-#   lasso_coef [ abs(lasso_coef) > 0 ]
-# }
+#### Test
+```{r}
+if (algo.stepwise == TRUE){
+  test.model(model.stepwise, data.test, "Stepwise Selection")
+}
 ```
 
-### LASSO (w/ full train)
+### Stepwise Selection (w/ filtered train)
 
+#### Train
+```{r Stepwise Selection with filtered data}
+if (algo.stepwise == TRUE){
+  t1 = Sys.time()
+  
+  model.stepwise2 = step(model.null2, scope=list(upper=model.full2), data = data.train2, direction="both", trace = 0)
+  print(summary(model.stepwise2))
+  #saveRDS(model.forward,file = "model_stepwise.rds")
+  
+  t2 = Sys.time()
+  print (paste("Time taken for Stepwise Selection: ",t2-t1, sep = ""))
+  
+  plot.diagnostics(model.stepwise2, data.train2)
+}
+```
+
+#### Test
+```{r}
+if (algo.stepwise == TRUE){
+  test.model(model.stepwise2, data.test, "Stepwise Selection (2)")
+}
+```
+
+
+### Stepwise Selection with Caret (w/ full train)# http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/
+
+#### Train
+```{r Stepwise Selection using caret}
+if (algo.stepwise.caret == TRUE){
+  train.control <- trainControl(method = "cv"
+                              ,number = 10
+                              ,search = "grid"
+                              ,verboseIter = TRUE
+                              )
+  
+  set.seed(1)
+  model.stepwise.caret <- caret::train(formula
+                                    , data = data.train
+                                    , method = "leapSeq"
+                                    , tuneGrid = data.frame(nvmax = 1:length(feature.names))
+                                    , trControl = train.control
+                              )
+  
+  print(model.stepwise.caret$results) # all model results
+  print(model.stepwise.caret$bestTune) # best model
+  
+  model.stepwise = model.stepwise.caret$finalModel
+  
+  # Provides the coefficients of the best model
+  id = rownames(model.stepwise.caret$bestTune)
+  coef(model.forward, id = id)
+  
+  # Need to find alternate to plotting diagnostic plots
+  # plot.diagnostics(model.forward,data.train)
+  # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
+}
+```
+
+#### Test
+```{r}
+if (algo.stepwise.caret == TRUE){
+  test.model(model.stepwise, data.test, "Stepwise Selection", regsubset = TRUE, id = id, formula = formula)
+}
+```
+
+### Forward Selection with Caret (w/ filtered train)
+
+#### Train
+```{r Stepwise Selection using caret filtered}
+if (algo.stepwise.caret == TRUE){
+  train.control <- trainControl(method = "cv"
+                              ,number = 10
+                              ,search = "grid"
+                              ,verboseIter = TRUE
+                              )
+  
+  set.seed(1)
+  model.stepwise.caret <- caret::train(formula
+                                    , data = data.test
+                                    , method = "leapSeq"
+                                    , tuneGrid = data.frame(nvmax = 1:length(feature.names))
+                                    , trControl = train.control
+                              )
+  
+  print(model.stepwise.caret$results) # all model results
+  print(model.stepwise.caret$bestTune) # best model
+  
+  model.stepwise = model.stepwise.caret$finalModel
+  
+  # Provides the coefficients of the best model
+  id = rownames(model.stepwise.caret$bestTune)
+  coef(model.forward, id = id)
+  
+  # Need to find alternate to plotting diagnostic plots
+  # plot.diagnostics(model.forward,data.train)
+  # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
+}
+```
+
+#### Test
+```{r}
+if (algo.stepwise.caret == TRUE){
+  test.model(model.stepwise, data.test, "Stepwise Selection", regsubset = TRUE, id = id, formula = formula)
+}
+```
+
+
+### LASSO (w/ full train)
+#### Train
 ```{r LASSO With full}
 if(algo.LASSO == TRUE){
   # Formatting data for GLM net
@@ -439,25 +760,32 @@ if(algo.LASSO == TRUE){
   ytest = data.test[,label.names] 
   
   grid=10^seq(10,-2, length =100)
+  
+  set.seed(1)
   model.LASSO=glmnet(x,y,alpha=1, lambda =grid)
   
   cv.out=cv.glmnet(x,y,alpha=1) # alpha=1 performs LASSO
   plot(cv.out)
   bestlambda<-cv.out$lambda.min  # Optimal penalty parameter.  You can make this call visually.
+  
+  print(coef(model.LASSO,s=bestlambda))
+}
+```
+
+#### Test
+```{r}
+if(algo.LASSO == TRUE){
   lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)
   
   testMSE_LASSO = mean((ytest-lasso.pred)^2)
   print (paste("LASSO Test RMSE: ",testMSE_LASSO, sep=""))
   
-  print(coef(model.LASSO,s=bestlambda))
-  
   plot(ytest,lasso.pred)
-  
 }
-
 ```
 
 ### LASSO (w/ filtered train)
+#### Train
 ```{r LASSO with high Cooks D filtered}
 if(algo.LASSO == TRUE){
   # Formatting data for GLM net
@@ -471,60 +799,135 @@ if(algo.LASSO == TRUE){
   ytest = data.test[,label.names] 
   
   grid=10^seq(10,-2, length =100)
+  
+  set.seed(1)
   model.LASSO=glmnet(x,y,alpha=1, lambda =grid)
   
   cv.out=cv.glmnet(x,y,alpha=1) # alpha=1 performs LASSO
   plot(cv.out)
   bestlambda<-cv.out$lambda.min  # Optimal penalty parameter.  You can make this call visually.
-  lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)
+  
+  print(coef(model.LASSO,s=bestlambda))
+}
+```
+
+#### Test
+```{r}
+if(algo.LASSO == TRUE){
+  lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)  
   
   testMSE_LASSO = mean((ytest-lasso.pred)^2)
   print (paste("LASSO Test RMSE: ",testMSE_LASSO, sep=""))
   
-  print(coef(model.LASSO,s=bestlambda))
-  
   plot(ytest,lasso.pred)
-
 }
+```
 
+### LASSO with Caret (w/ full train)
+#### Train
+```{r}
+if (algo.LASSO.caret == TRUE){
+  train.control <- trainControl(method = "cv"
+                              ,number = 10
+                              ,search = "grid"
+                              ,verboseIter = TRUE
+                              )
+  
+  lambda = 10^seq(-2,2, length =100)
+  alpha = c(1)
+  
+  tune.grid = expand.grid(alpha = alpha,lambda = lambda)
+  
+  # Will only show 1 Lambda value, but that is OK
+  # https://stackoverflow.com/questions/47526544/why-need-to-tune-lambda-with-carettrain-method-glmnet-and-cv-glmnet
+  set.seed(1)
+  model.LASSO.caret <- caret::train(formula
+                                  ,data = data.train 
+                                  ,method = "glmnet" 
+                                  ,trControl = train.control
+                                  ,tuneGrid = tune.grid
+                                   )
+  
+  
+  print(model.LASSO.caret)
+  plot(model.LASSO.caret)
+  
+  model.LASSO.caret$bestTune
+  summary(model.LASSO.caret$finalModel)
+  #coef(model.LASSO.caret$finalModel)
+}
 ```
 
 
-##LASSO calls
-Peforming a lasos call is pretty straight forward.  GLM-NET peforms 10-fold CV to determine an optimal penalty parameter.  
-The coefficients are easy to extract and making predictions are straight forward.  It is possible to make ASE style plots like we did previously but it takes a little extra programming. See me if interested.
-
-```{r eval=FALSE, include=FALSE, echo=T}
-library(glmnet)
-#Formatting data for GLM net
-x=model.matrix(AvgWinnings~.,train)[,-1] 
-y=log(train$AvgWinnings)
-
-xtest<-model.matrix(AvgWinnings~.,test)[,-1]
-ytest<-log(test$AvgWinnings)
-
-grid=10^seq(10,-2, length =100)
-lasso.mod=glmnet(x,y,alpha=1, lambda =grid)
-
-cv.out=cv.glmnet(x,y,alpha=1) #alpha=1 performs LASSO
-plot(cv.out)
-bestlambda<-cv.out$lambda.min  #Optimal penalty parameter.  You can make this call visually.
-lasso.pred=predict (lasso.mod ,s=bestlambda ,newx=xtest)
-
-testMSE_LASSO<-mean((ytest-lasso.pred)^2)
-testMSE_LASSO
+#### Test
+```{r}
+if (algo.LASSO.caret == TRUE){
+  xtest = as.matrix(data.test[,feature.names]) 
+  ytest = data.test[,label.names] 
+  
+  lasso.pred=predict(model.LASSO.caret, xtest )  
+ 
+  testMSE_LASSO = mean((ytest-lasso.pred)^2)
+  print (paste("LASSO Test RMSE: ",testMSE_LASSO, sep=""))
+    
+  plot(ytest,lasso.pred)
+}
 ```
 
 
-```{r eval=FALSE, include=FALSE, echo=T}
-coef(lasso.mod,s=bestlambda)
+### LASSO with Caret (w/ filtered dataset)
+#### Train
+```{r}
+if (algo.LASSO.caret == TRUE){
+  train.control <- trainControl(method = "cv"
+                              ,number = 10
+                              ,search = "grid"
+                              ,verboseIter = TRUE
+                              )
+  
+  lambda = 10^seq(-2,2, length =100)
+  alpha = c(1)
+  
+  tune.grid = expand.grid(alpha = alpha,lambda = lambda)
+  
+  # Will only show 1 Lambda value, but that is OK
+  # https://stackoverflow.com/questions/47526544/why-need-to-tune-lambda-with-carettrain-method-glmnet-and-cv-glmnet
+  set.seed(1)
+  model.LASSO.caret <- caret::train(formula
+                                  ,data = data.train2 
+                                  ,method = "glmnet" 
+                                  ,trControl = train.control
+                                  ,tuneGrid = tune.grid
+                                   )
+  
+  
+  print(model.LASSO.caret)
+  plot(model.LASSO.caret)
+  
+  model.LASSO.caret$bestTune
+  summary(model.LASSO.caret$finalModel)
+  #coef(model.LASSO.caret$finalModel)
+}
 ```
 
+
+#### Test
+```{r}
+if (algo.LASSO.caret == TRUE){
+  xtest = as.matrix(data.test[,feature.names]) 
+  ytest = data.test[,label.names] 
+  
+  lasso.pred=predict(model.LASSO.caret, xtest )  
+ 
+  testMSE_LASSO = mean((ytest-lasso.pred)^2)
+  print (paste("LASSO Test RMSE (2): ",testMSE_LASSO, sep=""))
+    
+  plot(ytest,lasso.pred)
+}
+```
 
 
 ```{r}
-# summary(model.forward)
-# summary(model.stepwise)
 ```
 
 
