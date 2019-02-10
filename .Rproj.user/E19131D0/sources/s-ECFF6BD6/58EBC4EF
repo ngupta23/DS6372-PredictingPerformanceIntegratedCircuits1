@@ -7,13 +7,14 @@
     "folds" : "",
     "hash" : "0",
     "id" : "58EBC4EF",
-    "lastKnownWriteTime" : 1549132748,
-    "last_content_update" : 1549132748,
+    "lastKnownWriteTime" : 1549810139,
+    "last_content_update" : 1549810139,
     "path" : "C:/Users/Nikhil/Google Drive Work/Education/SMU MSDS/201901/MSDS6372/Homework/Project1/MSDS-6372-Project1/Analysis/Max/max_sandbox.Rmd",
     "project_path" : "Analysis/Max/max_sandbox.Rmd",
     "properties" : {
-        "cursorPosition" : "98,59",
-        "scrollLine" : "0"
+        "cursorPosition" : "98,0",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "28"
     },
     "relative_order" : 2,
     "source_on_save" : false,
