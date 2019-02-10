@@ -210,7 +210,9 @@ t=round(cor(dplyr::select(data,-one_of('JobName'))),4)
 DT::datatable(t,options=list(scrollX=T))
 ```
  
-## Scatter Plots with Target Variables
+## Scatter Plots with Target Variable
+
+Scatter plots with all predictors and the target variable (**y3**)
 
 ```{r scatter_plots, fig.height=90, fig.width=7, cache=TRUE}
 d = gather(dplyr::select_at(data,c(predictors,target)),key=target,value=value,-y3)
@@ -275,6 +277,19 @@ ggplot(data=d, aes(x=value,y=y3log)) +
 #removing unwanted variables
 df=df %>%
   dplyr::select(-x18sqrt,-y3)
+```
+
+
+## Scatter Plots with transformed Target Variable 
+
+Scatter plots with all predictors and the transformed target variable (**y3LOG**)
+
+```{r scatter_plots_trs, fig.height=90, fig.width=7, cache=TRUE}
+d = gather(dplyr::select_at(df,c(predictors,target)),key=target,value=value,-y3log)
+ggplot(data=d, aes(x=value,y=y3log)) + 
+  geom_point(color='light green',alpha=0.5) + 
+  geom_smooth() + 
+  facet_wrap(~target, scales = 'free',ncol=4)
 ```
 
 
