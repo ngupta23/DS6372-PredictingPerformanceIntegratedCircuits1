@@ -120,6 +120,22 @@ ggplot(gather(select_at(data,target)), aes(sample=value)) +
 
 ```
 
+### Best Normalizator Y3
+
+Normalization of **Y3** using bestNormalize package.  (suggested orderNorm)
+This is cool, but I think is too far for the objective of the project
+
+```{r bestNormy, cache=T,fig.height=4}
+t=bestNormalize::bestNormalize(data$y3)
+t
+qqnorm(data$y3)
+qqnorm(predict(t))
+```
+
+**orderNorm()** is a rank-based procedure by which the values of a vector are mapped to their percentile, which is then mapped to the same percentile of the normal distribution. Without the presence of ties, this essentially guarantees that the transformation leads to a uniform distribution
+
+
+
 ## Predictors
 
 
@@ -147,7 +163,7 @@ lapply(select_at(data,cols),summary)
 Normalization of **X18** using bestNormalize package.  (suggested orderNorm)
 This is cool, but I think is too far for the objective of the project
 
-```{r bestNorm, cache=T,fig.height=3}
+```{r bestNorm, cache=T,fig.height=4}
 t=bestNormalize::bestNormalize(data$x18)
 t
 
@@ -165,7 +181,7 @@ qqnorm(newx18)
 Normalization of **X11** using bestNormalize package.  (suggested orderNorm)
 This is cool, but I think is too far for the objective of the project
 
-```{r  cache=T,fig.height=3}
+```{r  cache=T,fig.height=4}
 t=bestNormalize::bestNormalize(data$x11)
 t
 qqnorm(data$x11)

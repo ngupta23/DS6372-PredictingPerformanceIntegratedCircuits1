@@ -1,4 +1,5 @@
 base
+pacman
 sp
 raster
 usdm
@@ -28,7 +29,6 @@ ggformula
 mosaicData
 mosaic
 caTools
-bindrcpp
-pacman
 onewaytests
 bestNormalize
+bindrcpp
