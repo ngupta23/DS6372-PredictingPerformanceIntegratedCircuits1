@@ -192,7 +192,7 @@ hist(stud, freq=FALSE, main="Distribution of Studentized Residuals",
 xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
 
 MSE=Metrics::mse(df.train$y3log,predict(fit.lm.AIC,df.train))
-MSE
+message("MSE",MSE)
 ```
 
 ### LASSO reduction
@@ -226,6 +226,8 @@ message("MSE ",MSE)
 plot(pred,resid(fit.lm.lasso))
 
 plot(fit.lm.lasso)
+
+fit.lm.lasso
 
 ```
 
