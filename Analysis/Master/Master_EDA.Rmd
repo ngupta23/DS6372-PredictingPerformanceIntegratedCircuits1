@@ -1,0 +1,287 @@
+---
+title: "Master File"
+author: "Max Moro"
+date: "`r Sys.time()`"
+output:
+ html_document:
+   toc: true
+   toc_float: true
+   toc_depth: 3
+params:
+  output.var: 'y3'
+  transform.abs: FALSE
+  log.pred: FALSE
+  eda: FALSE
+  algo.forward: FALSE
+  algo.backward: FALSE
+  algo.stepwise: FALSE
+  algo.LASSO: TRUE
+  algo.LARS: FALSE
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pacman) #manages autoinstallation of packages
+pacman::p_load(usdm,tidyverse,ggplot2,PerformanceAnalytics,MASS,glmnet,investr,ggiraph,ggiraphExtra
+               ,DT,mosaic,usdm,caTools,onewaytests
+               ,bestNormalize)
+# library(usdm) #for multicollinearity
+# library(tidyverse)
+# library(ggplot2)
+# library(PerformanceAnalytics)
+# library(MASS)
+# library(glmnet)
+# library(investr)
+# library(ggiraph)
+# library(ggiraphExtra) #https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html
+# library(DT)
+# library(mosaic)
+# library(usdm) #for multicollinearity
+# library(caTools)
+sessionInfo()
+```
+
+# User Inputs
+
+```{r User Inputs}
+output.var = params$output.var 
+transform.abs = params$transform.abs
+log.pred = params$log.pred
+eda = params$eda
+algo.forward = params$algo.forward
+algo.backward = params$algo.backward
+algo.stepwise = params$algo.stepwise
+algo.LASSO = params$algo.LASSO
+algo.LARS = params$algo.LARS
+
+message("Parameters used for training/prediction: ")
+str(params)
+```
+
+
+```{r}
+# Setup Labels
+# alt.scale.label.name = Alternate Scale variable name
+#   - if predicting on log, then alt.scale is normal scale
+#   - if predicting on normal scale, then alt.scale is log scale
+if (log.pred == TRUE){
+  label.names = paste('log.',output.var,sep="")
+  alt.scale.label.name = output.var
+}
+if (log.pred == FALSE){
+  label.names = output.var
+  alt.scale.label.name = paste('log.',output.var,sep="")
+}
+```
+
+# Loading Data
+
+```{r load}
+feat  = read.csv('../../Data/features.csv')
+labels = read.csv('../../Data/labels.csv')
+predictors = names(dplyr::select(feat,-JobName))
+target = 'y3'
+data.ori = inner_join(feat,select_at(labels,c('JobName',target)),by='JobName')
+```
+ 
+# Data validation
+
+```{r data}
+cc  = complete.cases(data.ori)
+data.notComplete = data.ori[! cc,]
+data = data.ori[cc,]
+message('Non-Complete cases: ',nrow(data.notComplete))
+message('Complete cases: ',nrow(data))
+```
+
+# Normality and Variance
+
+## Target Variable
+
+The Target Variable **y3** shows  right skewness, so we suggest a log transofrmation ([Feature Eng] Section)
+
+### Histogram
+
+```{r fig.height=3}
+ggplot(gather(select_at(data,target)), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+```
+
+### QQPlot
+
+```{r fig.height=3}
+ggplot(gather(select_at(data,target)), aes(sample=value)) + 
+  stat_qq() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+```
+
+## Predictors
+
+
+All predictors show a **Fat-Tail** situation, where the two tails are very tall, and a low distribution around the mean.
+The orderNorm transromation can help (see [Best Normalizator] section)
+
+### Interesting Predictors. 
+
+```{r fig.height=3}
+cols = c('x11','x18')
+ggplot(gather(select_at(data,cols)), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+ggplot(gather(select_at(data,cols)), aes(sample=value)) + 
+  stat_qq()+
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+lapply(select_at(data,cols),summary)
+```
+
+### Best Normalizator X18
+
+Normalization of **X18** using bestNormalize package.  (suggested orderNorm)
+This is cool, but I think is too far for the objective of the project
+
+```{r bestNorm, cache=T,fig.height=3}
+t=bestNormalize::bestNormalize(data$x18)
+t
+
+newx18 = predict(t)
+qqnorm(data$x18)
+qqnorm(newx18)
+```
+
+**orderNorm()** is a rank-based procedure by which the values of a vector are mapped to their percentile, which is then mapped to the same percentile of the normal distribution. Without the presence of ties, this essentially guarantees that the transformation leads to a uniform distribution
+
+----------
+
+### Best Normalizator X11
+
+Normalization of **X11** using bestNormalize package.  (suggested orderNorm)
+This is cool, but I think is too far for the objective of the project
+
+```{r  cache=T,fig.height=3}
+t=bestNormalize::bestNormalize(data$x11)
+t
+qqnorm(data$x11)
+qqnorm( predict(t))
+```
+
+**orderNorm()** is a rank-based procedure by which the values of a vector are mapped to their percentile, which is then mapped to the same percentile of the normal distribution. Without the presence of ties, this essentially guarantees that the transformation leads to a uniform distribution
+
+### Histograms
+
+All indicators have a strong indication of  **Fat-Tails**
+
+```{r density, fig.height=70, fig.width=7, cache=TRUE}
+ggplot(gather(select_at(data,predictors)), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+```
+
+### QQPlots
+
+```{r qqplot, fig.height=70, fig.width=7, cache=TRUE}
+ggplot(gather(select_at(data,predictors)), aes(sample=value)) + 
+  stat_qq() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+```
+
+
+# Correlations
+
+## With Target Variable 
+```{r}
+#chart.Correlation(select(data,-JobName),  pch=21)
+t=round(cor(dplyr::select(data,-one_of(target,'JobName')),select_at(data,target)),4)
+DT::datatable(t)
+```
+
+## All  Variables
+```{r correlation, fig.height=7}
+#chart.Correlation(select(data,-JobName),  pch=21)
+t=round(cor(dplyr::select(data,-one_of('JobName'))),4)
+DT::datatable(t,options=list(scrollX=T))
+```
+ 
+## Scatter Plots with Target Variables
+
+```{r scatter_plots, fig.height=90, fig.width=7, cache=TRUE}
+d = gather(dplyr::select_at(data,c(predictors,target)),key=target,value=value,-y3)
+ggplot(data=d, aes(x=value,y=y3)) + 
+  geom_point(color='light blue',alpha=0.5) + 
+  geom_smooth() + 
+  facet_wrap(~target, scales = 'free',ncol=4)
+```
+
+## Multicollinearity - VIF
+
+No Multicollinearity among predictors
+
+Showing Top predictor by VIF Value
+
+```{r vif, cache=TRUE}
+vifDF = usdm::vif(select_at(data,predictors)) %>% arrange(desc(VIF))
+head(vifDF,10)
+```
+ 
+# Feature Eng
+
+- No trasnformation for x18
+
+- log transformatio for y3
+
+```{r}
+df=data %>%
+  mutate(x18sqrt = sqrt(x18)
+         ,y3log = log(y3)
+         ) 
+target='y3log'
+cols=c('y3','y3log','x18','x18sqrt')
+```
+
+## Density Plots
+
+**pre and post trasnformation **
+
+```{r fig.height=3}
+ggplot(gather(select_at(df,cols)), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+```
+
+## Scatter Plots
+
+**Vs y3log**
+
+
+```{r fig.height=3}
+cols2=cols[!cols %in% c('y3')]
+d = gather(dplyr::select_at(df,cols2),key=target,value=value,-y3log)
+ggplot(data=d, aes(x=value,y=y3log)) + 
+  geom_point(color='light blue',alpha=0.5) + 
+  geom_smooth() + 
+  facet_wrap(~target, scales = 'free',ncol=4)
+```
+
+```{r}
+#removing unwanted variables
+df=df %>%
+  dplyr::select(-x18sqrt,-y3)
+```
+
+
+# Conclusion
+
+- the target ariable **y3** can be LOG transformed
+
+- the predictor x18 is not improving with SQR trasformatioatn
+
+- all predictors could benefit with a *orderNorm* transformation

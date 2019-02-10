@@ -21,7 +21,9 @@ library(investr)
 library(ggiraph)
 library(ggiraphExtra) #https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html
 
+sessionInfo()
 ```
+
 
 # Loading Data
 
