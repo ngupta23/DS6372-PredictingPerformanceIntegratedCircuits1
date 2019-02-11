@@ -1,0 +1,236 @@
+---
+title: "Max Sandbox"
+author: "Max"
+date: "January 31, 2019"
+output:
+ html_document:
+   toc: true
+   toc_float: true
+   toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(usdm) #for multicollinearity
+library(tidyverse)
+library(ggplot2)
+library(PerformanceAnalytics)
+library(MASS)
+library(glmnet)
+library(investr)
+library(ggiraph)
+library(ggiraphExtra) #https://cran.r-project.org/web/packages/ggiraphExtra/vignettes/ggPredict.html
+
+sessionInfo()
+```
+
+
+# Loading Data
+
+```{r load}
+feat  = read.csv('../../Data/features.csv')
+labels = read.csv('../../Data/labels.csv')
+predictors = names(dplyr::select(feat,-JobName))
+target = 'y3'
+data = inner_join(feat,select_at(labels,c('JobName',target)),by='JobName')
+```
+
+# Data validation
+
+
+```{r data}
+
+data.cc  = complete.cases(data)
+data.notComplete = data[! data.cc,]
+data.complete = data[data.cc,]
+message('Non-Complete cases: ',nrow(data.notComplete))
+```
+
+**Question**: Y3 has all  the non-complete casesI guess hese are the cases for prediction, right?
+
+No null-cases on features :)
+
+```{r feat}
+feat.cc  = complete.cases(feat)
+feat.notComplete = feat[! feat.cc,]
+feat.complete = feat[feat.cc,]
+message('Non-Complete cases: ',nrow(feat.notComplete))
+```
+
+# Distribution
+
+## Target Variable
+
+```{r}
+ggplot(gather(select_at(data,target)), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+```
+
+
+## Predictors
+
+Check Variable X11, has a strange distribution, with narrow ranges. 
+
+
+```{r}
+print(summary(data$x11))
+```
+
+```{r}
+ggplot(gather(select_at(data,'x11')), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+```
+
+**Other variables**
+
+```{r  fig.height=70, fig.width=7}
+ggplot(gather(select_at(data,predictors)), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+```
+
+
+# Correlation
+
+## With Target Variable 
+```{r}
+#chart.Correlation(select(data,-JobName),  pch=21)
+t=round(cor(dplyr::select(data.complete,-one_of(target,'JobName')),select_at(data.complete,target)),4)
+DT::datatable(t)
+```
+
+## All  Variables
+```{r fig.height=7}
+#chart.Correlation(select(data,-JobName),  pch=21)
+t=round(cor(dplyr::select(data.complete,-one_of('JobName'))),4)
+DT::datatable(t,options=list(scrollX=T))
+```
+
+
+## Multicollinearity - VIF
+
+No Multicollinearity among predictors
+
+```{r vif}
+vifDF = usdm::vif(select_at(data,predictors)) %>% arrange(desc(VIF))
+head(vifDF,10)
+```
+
+ 
+# Feature Eng
+
+- No trasnformation for x18
+
+- log transformatio for y3
+
+```{r}
+df=data.complete %>%
+  mutate(x18sqrt = sqrt(x18)
+         ,y3log = log(y3)
+         ) 
+target='y3log'
+ggplot(gather(select_at(df,c('y3','y3log','x18','x18sqrt'))), aes(value)) + 
+  geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
+  geom_density() + 
+  facet_wrap(~key, scales = 'free',ncol=4)
+
+df=df %>%
+  dplyr::select(-x18sqrt,-y3)
+```
+
+
+# Model
+
+## Train & Test
+
+```{r}
+df.train = df %>% sample_frac(.70)
+df.test = df %>% anti_join(df, df.train, by = 'JobName')
+
+```
+
+
+## LM model
+
+### OLS
+
+```{r}
+df.train.fit = dplyr::select(df.train,-JobName)
+fit.lm = lm(data=df.train.fit, formula = y3log ~ .)
+summary(fit.lm) # adj. R2 = 0.2248
+#residual plot
+plot(fit.lm, which=c(1:3))
+stud <- rstudent(fit.lm)
+hist(stud, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+
+MSE=Metrics::mse(df.train$y3log,predict(fit.lm,df.train))
+MSE
+```
+
+### OLS-Stepwise reduction
+
+```{r}
+# Stepwise
+#http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/ 
+
+#fit.lm.AIC=MASS::stepAIC(fit.lm,direction='both')
+#saveRDS(fit.lm.AIC,'fit.lm.AIC.rds')
+
+fit.lm.AIC = readRDS('fit.lm.AIC.rds')
+summary(fit.lm.AIC) #ajd R2 = 0.2388
+
+
+plot(fit.lm.AIC, which=c(1:3))
+stud <- rstudent(fit.lm.AIC)
+hist(stud, freq=FALSE, main="Distribution of Studentized Residuals",
+xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
+
+MSE=Metrics::mse(df.train$y3log,predict(fit.lm.AIC,df.train))
+message("MSE",MSE)
+```
+
+### LASSO reduction
+
+```{r}
+# Lasso
+#https://beta.vu.nl/nl/Images/werkstuk-fonti_tcm235-836234.pdf 
+
+fit.lm.lasso = cv.glmnet(x=as.matrix(df.train[,predictors]),y=df.train[,target]
+               ,standardize=T,type.measure='mse',nfolds=5,alpha=1)
+plot(fit.lm.lasso)
+#fit.lm.lasso
+lambda = fit.lm.lasso$lambda.1se
+lambdaID=which(fit.lm.lasso$glmnet.fit$lambda==lambda)
+
+#rsq http://myweb.uiowa.edu/pbreheny/7600/s16/notes/2-22.pdf 
+r2s = 1 - fit.lm.lasso$cvm/var(df.train[,target])
+message("Lambda: ",lambda)
+message("R2: ",r2s[lambdaID])
+plot(fit.lm.lasso$lambda,r2s)
+
+#deviation
+#https://stats.stackexchange.com/questions/70249/feature-selection-model-with-glmnet-on-methylation-data-pn
+fit.lm.lasso$glmnet.fit$dev.ratio[lambdaID]
+
+
+pred = glmnet::predict.cv.glmnet(fit.lm.lasso,s='lambda.1se',newx=as.matrix(df.train[,predictors]))#, type = 'coefficients')
+
+MSE=Metrics::mse(df.train$y3log,pred)
+message("MSE ",MSE)
+plot(pred,resid(fit.lm.lasso))
+
+plot(fit.lm.lasso)
+
+fit.lm.lasso
+
+```
+
+
