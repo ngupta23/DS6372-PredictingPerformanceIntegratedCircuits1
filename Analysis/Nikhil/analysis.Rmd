@@ -386,7 +386,7 @@ train.caret.glmselect = function(formula, data, method
     id = rownames(model.caret$bestTune)
     message("Coefficients of final model:")
     print (coef(model, id = id))
-    
+    #browser()
     # Need to find alternate to plotting diagnostic plots
     # plot.diagnostics(model.forward,data.train)
     # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
@@ -486,8 +486,16 @@ model.full2 = lm(formula , data.train2)
 summary(model.full2)
 cd.full2 = plot.diagnostics(model.full2, data.train2)
 
+
 # much more normal residuals than before. 
 # See if you can check the distribution (boxplots) of the high leverage points and the other points
+cd.compare  = data.frame(cd = cd.full) %>% mutate(type = ifelse(cd > 4/nrow(data.train),'High','Normal'))
+ggplot(data=cd.compare, aes(x=type,y=cd)) +
+  geom_boxplot(fill='light blue') +
+  scale_y_continuous(trans='log',name="Cook's Distance (log)") +
+  theme_light() +
+  ggtitle('Distribution of High Leverage Points and Normal  Points')
+
 ```
 
 ```{r}
