@@ -397,7 +397,7 @@ train.caret.glmselect = function(formula, data, method
     print(model.caret$bestTune) # best model
   
     model = model.caret$finalModel
-  
+
     # Residuals Plot  MMORO #
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
@@ -409,11 +409,10 @@ train.caret.glmselect = function(formula, data, method
     id = rownames(model.caret$bestTune)
     message("Coefficients of final model:")
     print (coef(model, id = id))
-    
     # Need to find alternate to plotting diagnostic plots
     # plot.diagnostics(model.forward,data.train)
     # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
-    return(list(model = model,id = id))
+    return(list(model = model,id = id,residPlot = residPlot ))
   }
   if (method == 'glmnet' && subopt == 'LASSO'){
     print(model.caret)
@@ -426,9 +425,9 @@ train.caret.glmselect = function(formula, data, method
       geom_point(color='light blue',alpha=0.7) +
       geom_smooth()
     plot(residPlot)
-    
-    id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id))
+
+        id = NULL # not really needed but added for consistency
+    return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
   if (method == 'lars'){
     print(model.caret)
@@ -436,13 +435,14 @@ train.caret.glmselect = function(formula, data, method
     print(model.caret$bestTune)
     
      # Residuals Plot #
+
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
       geom_smooth()
     plot(residPlot)
     id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id))
+    return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
 }
 
@@ -523,6 +523,7 @@ data.train2 = data.train[!(rownames(data.train)) %in% high.cd,]
 model.full2 = lm(formula , data.train2)
 summary(model.full2)
 cd.full2 = plot.diagnostics(model.full2, data.train2)
+
 
 # much more normal residuals than before. 
 # See if you can check the distribution (boxplots) of the high leverage points and the other points
@@ -803,6 +804,7 @@ if (algo.stepwise.caret == TRUE){
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
              ,draw.limits = TRUE)
+  
 }
 ```
 
