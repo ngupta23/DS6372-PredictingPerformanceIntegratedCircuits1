@@ -403,7 +403,7 @@ train.caret.glmselect = function(formula, data, method
     print(plot(model.caret))
     print(model.caret$bestTune)
     
-    # Residuals Plot #
+    # Residuals Plot MMORO #
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
@@ -417,7 +417,7 @@ train.caret.glmselect = function(formula, data, method
     print(plot(model.caret))
     print(model.caret$bestTune)
     
-    # Residuals Plot #
+    # Residuals Plot MMORO #
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
