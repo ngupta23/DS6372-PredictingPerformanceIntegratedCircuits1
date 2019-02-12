@@ -381,30 +381,50 @@ train.caret.glmselect = function(formula, data, method
     print(model.caret$bestTune) # best model
   
     model = model.caret$finalModel
-  
+    
+    # Residuals Plot #
+    dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
+    residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
+      geom_point(color='light blue',alpha=0.7) +
+      geom_smooth()
+
+    
     # Provides the coefficients of the best model
     id = rownames(model.caret$bestTune)
     message("Coefficients of final model:")
     print (coef(model, id = id))
-    #browser()
     # Need to find alternate to plotting diagnostic plots
     # plot.diagnostics(model.forward,data.train)
     # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
-    return(list(model = model,id = id))
+    return(list(model = model,id = id,residPlot = residPlot ))
   }
   if (method == 'glmnet' && subopt == 'LASSO'){
     print(model.caret)
     print(plot(model.caret))
     print(model.caret$bestTune)
+    
+    # Residuals Plot #
+    dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
+    residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
+      geom_point(color='light blue',alpha=0.7) +
+      geom_smooth()
+    
     id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id))
+    return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
   if (method == 'lars'){
     print(model.caret)
     print(plot(model.caret))
     print(model.caret$bestTune)
+    
+    # Residuals Plot #
+    dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
+    residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
+      geom_point(color='light blue',alpha=0.7) +
+      geom_smooth()
+    
     id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id))
+    return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
 }
 
@@ -489,6 +509,7 @@ cd.full2 = plot.diagnostics(model.full2, data.train2)
 
 # much more normal residuals than before. 
 # See if you can check the distribution (boxplots) of the high leverage points and the other points
+# High Leverage Plot ###
 cd.compare  = data.frame(cd = cd.full) %>% mutate(type = ifelse(cd > 4/nrow(data.train),'High','Normal'))
 ggplot(data=cd.compare, aes(x=type,y=cd)) +
   geom_boxplot(fill='light blue') +
@@ -576,6 +597,7 @@ if (algo.forward.caret == TRUE){
                                    , feature.names = feature.names)
   model.forward = returned$model
   id = returned$id
+  returned$residPlot
 }
 ```
 
@@ -602,6 +624,7 @@ if (algo.forward.caret == TRUE){
                                    ,feature.names = feature.names)
   model.forward = returned$model
   id = returned$id
+   returned$residPlot
 }
 ```
 
@@ -653,6 +676,7 @@ if (algo.backward.caret == TRUE){
                                    ,feature.names =  feature.names)
   model.backward = returned$model
   id = returned$id
+   returned$residPlot
 }
 ```
 
@@ -678,6 +702,7 @@ if (algo.backward.caret == TRUE){
                                    ,feature.names = feature.names)
   model.backward = returned$model
   id = returned$id
+   returned$residPlot
 }
 ```
 
@@ -754,6 +779,7 @@ if (algo.stepwise.caret == TRUE){
                                    ,feature.names = feature.names)
   model.stepwise = returned$model
   id = returned$id
+   returned$residPlot
 }
 ```
 
@@ -766,6 +792,7 @@ if (algo.stepwise.caret == TRUE){
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
              ,draw.limits = TRUE)
+  
 }
 ```
 
@@ -781,6 +808,7 @@ if (algo.stepwise.caret == TRUE){
                                    ,feature.names =  feature.names)
   model.stepwise = returned$model
   id = returned$id
+   returned$residPlot
 }
 ```
 
@@ -884,6 +912,7 @@ if (algo.LASSO.caret == TRUE){
                                    ,subopt = 'LASSO'
                                    ,feature.names = feature.names)
   model.LASSO.caret = returned$model
+   returned$residPlot
 }
 ```
 
@@ -910,6 +939,7 @@ if (algo.LASSO.caret == TRUE){
                                    ,subopt = 'LASSO'
                                    ,feature.names = feature.names)
   model.LASSO.caret = returned$model
+   returned$residPlot
 }
 ```
 
@@ -936,6 +966,7 @@ if (algo.LARS.caret == TRUE){
                                    ,subopt = 'NULL'
                                    ,feature.names = feature.names)
   model.LARS.caret = returned$model
+   returned$residPlot
 }
 ```
 
@@ -961,6 +992,7 @@ if (algo.LARS.caret == TRUE){
                                    ,subopt = 'NULL'
                                    ,feature.names = feature.names)
   model.LARS.caret = returned$model
+   returned$residPlot
 }
 ```
 
