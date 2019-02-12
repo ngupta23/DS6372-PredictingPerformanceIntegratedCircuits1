@@ -387,8 +387,7 @@ train.caret.glmselect = function(formula, data, method
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
       geom_smooth()
-
-    
+    plot(residPlot)
     # Provides the coefficients of the best model
     id = rownames(model.caret$bestTune)
     message("Coefficients of final model:")
@@ -408,7 +407,7 @@ train.caret.glmselect = function(formula, data, method
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
       geom_smooth()
-    
+    plot(residPlot)
     id = NULL # not really needed but added for consistency
     return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
@@ -422,7 +421,7 @@ train.caret.glmselect = function(formula, data, method
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
       geom_smooth()
-    
+    plot(residPlot)
     id = NULL # not really needed but added for consistency
     return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
@@ -597,7 +596,6 @@ if (algo.forward.caret == TRUE){
                                    , feature.names = feature.names)
   model.forward = returned$model
   id = returned$id
-  returned$residPlot
 }
 ```
 
@@ -624,7 +622,6 @@ if (algo.forward.caret == TRUE){
                                    ,feature.names = feature.names)
   model.forward = returned$model
   id = returned$id
-   returned$residPlot
 }
 ```
 
@@ -676,7 +673,6 @@ if (algo.backward.caret == TRUE){
                                    ,feature.names =  feature.names)
   model.backward = returned$model
   id = returned$id
-   returned$residPlot
 }
 ```
 
@@ -702,7 +698,6 @@ if (algo.backward.caret == TRUE){
                                    ,feature.names = feature.names)
   model.backward = returned$model
   id = returned$id
-   returned$residPlot
 }
 ```
 
@@ -779,7 +774,6 @@ if (algo.stepwise.caret == TRUE){
                                    ,feature.names = feature.names)
   model.stepwise = returned$model
   id = returned$id
-   returned$residPlot
 }
 ```
 
@@ -808,7 +802,6 @@ if (algo.stepwise.caret == TRUE){
                                    ,feature.names =  feature.names)
   model.stepwise = returned$model
   id = returned$id
-   returned$residPlot
 }
 ```
 
@@ -912,7 +905,6 @@ if (algo.LASSO.caret == TRUE){
                                    ,subopt = 'LASSO'
                                    ,feature.names = feature.names)
   model.LASSO.caret = returned$model
-   returned$residPlot
 }
 ```
 
@@ -939,7 +931,6 @@ if (algo.LASSO.caret == TRUE){
                                    ,subopt = 'LASSO'
                                    ,feature.names = feature.names)
   model.LASSO.caret = returned$model
-   returned$residPlot
 }
 ```
 
@@ -966,7 +957,6 @@ if (algo.LARS.caret == TRUE){
                                    ,subopt = 'NULL'
                                    ,feature.names = feature.names)
   model.LARS.caret = returned$model
-   returned$residPlot
 }
 ```
 
@@ -992,7 +982,6 @@ if (algo.LARS.caret == TRUE){
                                    ,subopt = 'NULL'
                                    ,feature.names = feature.names)
   model.LARS.caret = returned$model
-   returned$residPlot
 }
 ```
 
