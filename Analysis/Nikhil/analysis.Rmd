@@ -34,32 +34,38 @@ sessionInfo()
 ```
 
 ```{r include=FALSE}
-# https://gist.github.com/smithdanielle/9913897
-check.packages <- function(pkg){
-    new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-    if (length(new.pkg))
-        install.packages(new.pkg, dependencies = TRUE)
-    #sapply(pkg, require, character.only = TRUE)
-    sapply(pkg, library, character.only = TRUE) # see comment below in GitHub repo
-}
+# # https://gist.github.com/smithdanielle/9913897
+# check.packages <- function(pkg){
+#     new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+#     if (length(new.pkg))
+#         install.packages(new.pkg, dependencies = TRUE)
+#     #sapply(pkg, require, character.only = TRUE)
+#     sapply(pkg, library, character.only = TRUE) # see comment below in GitHub repo
+# }
+# 
+# # Usage example
+# packages<-c("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel")
+# check.packages(packages)
 
-# Usage example
-packages<-c("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel")
-check.packages(packages)
+# library(dplyr)
+# library(DT)
+# library(mosaic)
+# library(MASS)
+# library(usdm) #for multicollinearity
+# library(tidyverse)
+# library(ggplot2)
+# library(PerformanceAnalytics)
+# library(caTools)
+# library(glmnet)
+# library(caret)
+# library(leaps)
+# library(doParallel)
 
-library(dplyr)
-library(DT)
-library(mosaic)
-library(MASS)
-library(usdm) #for multicollinearity
-library(tidyverse)
-library(ggplot2)
-library(PerformanceAnalytics)
-library(caTools)
-library(glmnet)
-library(caret)
-library(leaps)
-library(doParallel)
+
+#This line of code installs the pacman page if you do not have it installed - if you do, it simply loads the package
+if(!require(pacman))install.packages("pacman")
+pacman::p_load("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel")
+
 ```
 
 # User Inputs
@@ -105,6 +111,16 @@ if (log.pred == FALSE){
 ## Read and Clean Features
 ```{r}
 features = read.csv("../../Data/features.csv")
+features.highprec = read.csv("../../Data/features_highprec.csv")
+```
+
+```{r}
+all.equal(features, features.highprec)
+
+head(features)
+head(features.highprec)
+
+features = features.highprec
 #str(features) 
 ```
 
@@ -381,30 +397,52 @@ train.caret.glmselect = function(formula, data, method
     print(model.caret$bestTune) # best model
   
     model = model.caret$finalModel
-  
+
+    # Residuals Plot  MMORO #
+    dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
+    residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
+      geom_point(color='light blue',alpha=0.7) +
+      geom_smooth()
+    plot(residPlot)
+    
     # Provides the coefficients of the best model
     id = rownames(model.caret$bestTune)
     message("Coefficients of final model:")
     print (coef(model, id = id))
-    
     # Need to find alternate to plotting diagnostic plots
     # plot.diagnostics(model.forward,data.train)
     # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
-    return(list(model = model,id = id))
+    return(list(model = model,id = id,residPlot = residPlot ))
   }
   if (method == 'glmnet' && subopt == 'LASSO'){
     print(model.caret)
     print(plot(model.caret))
     print(model.caret$bestTune)
-    id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id))
+    
+    # Residuals Plot #
+    dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
+    residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
+      geom_point(color='light blue',alpha=0.7) +
+      geom_smooth()
+    plot(residPlot)
+
+        id = NULL # not really needed but added for consistency
+    return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
   if (method == 'lars'){
     print(model.caret)
     print(plot(model.caret))
     print(model.caret$bestTune)
+    
+     # Residuals Plot #
+
+    dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
+    residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
+      geom_point(color='light blue',alpha=0.7) +
+      geom_smooth()
+    plot(residPlot)
     id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id))
+    return(list(model = model.caret,id = id,residPlot = residPlot ))
   }
 }
 
@@ -486,8 +524,16 @@ model.full2 = lm(formula , data.train2)
 summary(model.full2)
 cd.full2 = plot.diagnostics(model.full2, data.train2)
 
+
 # much more normal residuals than before. 
 # See if you can check the distribution (boxplots) of the high leverage points and the other points
+# High Leverage Plot MMORO ### 
+cd.compare  = data.frame(cd = cd.full) %>% mutate(type = ifelse(cd > 4/nrow(data.train),'High','Normal'))
+ggplot(data=cd.compare, aes(x=type,y=cd)) +
+  geom_boxplot(fill='light blue') +
+  scale_y_continuous(trans='log',name="Cook's Distance (log)") +
+  theme_light() +
+  ggtitle('Distribution of High Leverage Points and Normal  Points')
 ```
 
 ```{r}
@@ -758,6 +804,7 @@ if (algo.stepwise.caret == TRUE){
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
              ,draw.limits = TRUE)
+  
 }
 ```
 

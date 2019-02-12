@@ -5,3 +5,4 @@
 desktop.ini
 */.Rproj.user
 .RData
+*/*.RData
