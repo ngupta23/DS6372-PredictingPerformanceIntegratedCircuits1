@@ -9,7 +9,7 @@ output:
    toc_depth: 5
 params:
   output.var: 'y3'
-  trans: 0 
+  trans: 2 
   # Transformations: 
   # 0 for no transformaton, 
   # 1 for back to ABS scale, 
@@ -23,10 +23,10 @@ params:
   algo.LARS: FALSE
   
   algo.forward.caret: TRUE
-  algo.backward.caret: FALSE
-  algo.stepwise.caret: FALSE
-  algo.LASSO.caret: FALSE
-  algo.LARS.caret: FALSE
+  algo.backward.caret: TRUE
+  algo.stepwise.caret: TRUE
+  algo.LASSO.caret: TRUE
+  algo.LARS.caret: TRUE
 ---
 
 ```{r setup, include=FALSE}
@@ -40,7 +40,7 @@ sessionInfo()
 ```{r include=FALSE}
 #This line of code installs the pacman page if you do not have it installed - if you do, it simply loads the package
 if(!require(pacman))install.packages("pacman")
-pacman::p_load("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel","lars","reshape2", "ggforce","rlist", "bestNormalize")
+pacman::p_load("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel","lars","reshape2", "ggforce","rlist", "bestNormalize","car","htmltools")
 
 ```
 
@@ -337,6 +337,27 @@ plot.diagnostics <-  function(model, train) {
   return(cd)
 }
 
+# function to set up random seeds
+# with small changes from:
+# http://jaehyeon-kim.github.io/2015/05/Setup-Random-Seeds-on-Caret-Package.html 
+setCaretSeeds <- function(method = "cv", numbers = 1, repeats = 1, tunes = NULL, seed = 1701) {
+  #B is the number of resamples and integer vector of M (numbers + tune length if any)
+  B <- if (method == "cv") numbers
+  else if(method == "repeatedcv") numbers * repeats
+  else NULL
+  if(is.null(length)) {
+    seeds <- NULL
+  } else {
+    set.seed(seed = seed)
+    seeds <- vector(mode = "list", length = B)
+    seeds <- lapply(seeds, function(x) sample.int(n = 1000000
+                                                  , size = numbers + ifelse(is.null(tunes), 0, tunes)))
+    seeds[[length(seeds) + 1]] <- sample.int(n = 1000000, size = 1)
+  }
+  # return seeds
+  seeds
+}
+
 train.caret.glmselect = function(formula, data, method
                                  ,subopt = NULL, feature.names
                                  , train.control = NULL, tune.grid = NULL, pre.proc = NULL){
@@ -344,6 +365,9 @@ train.caret.glmselect = function(formula, data, method
   if(is.null(train.control)){
     train.control <- trainControl(method = "cv"
                               ,number = 10
+                              ,seeds = setCaretSeeds(method = "cv"
+                                                     , numbers = 10
+                                                     , seed = 1701)
                               ,search = "grid"
                               ,verboseIter = TRUE
                               ,allowParallel = TRUE
@@ -389,10 +413,13 @@ train.caret.glmselect = function(formula, data, method
   registerDoSEQ() # register sequential engine in case you are not using this function anymore
   
   if (method == 'leapForward' | method == 'leapBackward' | method == 'leapSeq'){
+    h4("All models results")
     print(model.caret$results) # all model results
+    h4("Best Model")
     print(model.caret$bestTune) # best model
-  
+    
     model = model.caret$finalModel
+    
 
     # Metrics Plot 
     dataPlot = model.caret$results %>%
@@ -419,13 +446,23 @@ train.caret.glmselect = function(formula, data, method
       geom_density(color='lightblue4') + 
       theme_light()
     plot(residHistogram)
-    
+    id = rownames(model.caret$bestTune)    
     # Provides the coefficients of the best model
-    id = rownames(model.caret$bestTune)
-    message("Coefficients of final model:")
-    print (coef(model, id = id))
-    
-    return(list(model = model,id = id, residPlot = residPlot, residHistogram=residHistogram))
+    # regsubsets doens return a full model (see documentation of regsubset), so we need to recalcualte themodel
+    # https://stackoverflow.com/questions/13063762/how-to-obtain-a-lm-object-from-regsubsets
+    h4("Coefficients of final model:")
+    coefs <- coef(model, id=id)
+    #calculate the model to the the coef intervals
+    nams <- names(coefs)
+    nams <- nams[!nams %in% "(Intercept)"]
+    response <-  as.character(formula[[2]])
+    form <- as.formula(paste(response, paste(nams, collapse = " + "), sep = " ~ "))
+    mod <- lm(form, data = data)
+    #coefs
+    #coef(mod)
+    print(car::Confint(mod))
+    return(list(model = model,id = id, residPlot = residPlot, residHistogram=residHistogram
+                ,modelLM=mod))
   }
   if (method == 'glmnet' && subopt == 'LASSO'){
     print(model.caret)
@@ -433,7 +470,7 @@ train.caret.glmselect = function(formula, data, method
     print(model.caret$bestTune)
     
     print(model.caret$results)
-    
+    model=model.caret$finalModel
     # Metrics Plot 
     dataPlot = model.caret$results %>%
       gather(key='metric',value='value',-lambda) %>%
@@ -458,7 +495,12 @@ train.caret.glmselect = function(formula, data, method
       geom_density(color='lightblue4') +
       theme_light()
     plot(residHistogram)
-
+    
+    h4("Coefficients") 
+    #no interval for glmnet https://stackoverflow.com/questions/39750965/confidence-intervals-for-ridge-regression
+    
+    t=coef(model,s=model.caret$bestTune$lambda)
+    t[which(t[,1]!=0),]
     id = NULL # not really needed but added for consistency
     return(list(model = model.caret,id = id, residPlot = residPlot, metricsPlot=metricsPlot ))
   }
@@ -491,7 +533,10 @@ train.caret.glmselect = function(formula, data, method
       geom_density(color='lightblue4') + 
       theme_light()
     plot(residHistogram)
-
+    
+    h4("Coefficients") 
+    t=coef(model,s=model.caret$bestTune$lambda)
+    t[which(t[,1]>0),]
     id = NULL # not really needed but added for consistency
     return(list(model = model.caret,id = id, residPlot = residPlot, residHistogram=residHistogram))
   }
@@ -716,7 +761,7 @@ if (algo.forward == TRUE){
 ### Forward Selection with CV (w/ full train) 
 
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.forward.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -729,7 +774,7 @@ if (algo.forward.caret == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.forward.caret == TRUE){
     test.model(model.forward, data.test
              ,method = 'leapForward',subopt = NULL
@@ -743,7 +788,7 @@ if (algo.forward.caret == TRUE){
 ### Forward Selection with CV (w/ filtered train)
 
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.forward.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -756,7 +801,7 @@ if (algo.forward.caret == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.forward.caret == TRUE){
   test.model(model.forward, data.test
              ,method = 'leapForward',subopt = NULL
@@ -769,7 +814,7 @@ if (algo.forward.caret == TRUE){
 ### Backward Elimination
 
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.backward == TRUE){
   # Takes too much time
   t1 = Sys.time()
@@ -785,7 +830,7 @@ if (algo.backward == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.backward == TRUE){
   test.model(model.backard, data.test, "Backward Elimination")
 }
@@ -793,7 +838,7 @@ if (algo.backward == TRUE){
 
 ### Backward Elimination with CV (w/ full train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.backward.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -806,7 +851,7 @@ if (algo.backward.caret == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.backward.caret == TRUE){
   test.model(model.backward, data.test
              ,method = 'leapBackward',subopt = NULL
@@ -818,7 +863,7 @@ if (algo.backward.caret == TRUE){
 
 ### Backward Elimination with CV (w/ filtered train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.backward.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -831,7 +876,7 @@ if (algo.backward.caret == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.backward.caret == TRUE){
   test.model(model.backward, data.test
              ,method = 'leapBackward',subopt = NULL
@@ -844,7 +889,7 @@ if (algo.backward.caret == TRUE){
 ### Stepwise Selection (w/ full train)
 
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.stepwise == TRUE){
   t1 = Sys.time()
   
@@ -859,7 +904,7 @@ if (algo.stepwise == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.stepwise == TRUE){
   test.model(model.stepwise, data.test, "Stepwise Selection")
 }
@@ -868,7 +913,7 @@ if (algo.stepwise == TRUE){
 ### Stepwise Selection (w/ filtered train)
 
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.stepwise == TRUE){
   t1 = Sys.time()
   
@@ -883,7 +928,7 @@ if (algo.stepwise == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.stepwise == TRUE){
   test.model(model.stepwise2, data.test, "Stepwise Selection (2)")
 }
@@ -892,7 +937,7 @@ if (algo.stepwise == TRUE){
 
 ### Stepwise Selection with CV (w/ full train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.stepwise.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -905,7 +950,7 @@ if (algo.stepwise.caret == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.stepwise.caret == TRUE){
   test.model(model.stepwise, data.test
              ,method = 'leapSeq',subopt = NULL
@@ -919,7 +964,7 @@ if (algo.stepwise.caret == TRUE){
 ### Stepwise Selection with CV (w/ filtered train)
 
 #### Train
-```{r eval=FALSE, include=FALSE}
+```{r eval=FALSE, include=FALSE, fig.height=5}
 if (algo.stepwise.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -932,7 +977,7 @@ if (algo.stepwise.caret == TRUE){
 ```
 
 #### Test
-```{r eval=FALSE, include=FALSE}
+```{r eval=FALSE, include=FALSE, fig.height=5}
 if (algo.stepwise.caret == TRUE){
   test.model(model.stepwise, data.test
              ,method = 'leapSeq',subopt = NULL
@@ -944,7 +989,7 @@ if (algo.stepwise.caret == TRUE){
 
 ### LASSO (w/ full train)
 #### Train
-```{r}
+```{r fig.height=5}
 if(algo.LASSO == TRUE){
   # Formatting data for GLM net
   # you can use model.matrix as well -- model.matrix creates a design (or model) matrix, 
@@ -970,7 +1015,7 @@ if(algo.LASSO == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if(algo.LASSO == TRUE){
   lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)
   
@@ -983,7 +1028,7 @@ if(algo.LASSO == TRUE){
 
 ### LASSO (w/ filtered train)
 #### Train
-```{r}
+```{r fig.height=5}
 if(algo.LASSO == TRUE){
   # Formatting data for GLM net
   # you can use model.matrix as well -- model.matrix creates a design (or model) matrix, 
@@ -1009,7 +1054,7 @@ if(algo.LASSO == TRUE){
 ```
 
 #### Test
-```{r}
+```{r fig.height=5}
 if(algo.LASSO == TRUE){
   lasso.pred=predict (model.LASSO ,s=bestlambda ,newx=xtest)  
   
@@ -1022,7 +1067,7 @@ if(algo.LASSO == TRUE){
 
 ### LASSO with CV (w/ full train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.LASSO.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -1048,7 +1093,7 @@ if (algo.LASSO.caret == TRUE){
 
 ### LASSO with CV (w/ filtered train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.LASSO.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -1062,7 +1107,7 @@ if (algo.LASSO.caret == TRUE){
 
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.LASSO.caret == TRUE){
   test.model(model.LASSO.caret, data.test
              ,method = 'glmnet',subopt = "LASSO"
@@ -1074,7 +1119,7 @@ if (algo.LASSO.caret == TRUE){
 
 ### LARS with CV (w/ full train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.LARS.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -1088,7 +1133,7 @@ if (algo.LARS.caret == TRUE){
 
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.LARS.caret == TRUE){
   test.model(model.LARS.caret, data.test
              ,method = 'lars',subopt = NULL
@@ -1099,7 +1144,7 @@ if (algo.LARS.caret == TRUE){
 
 ### LARS with CV (w/ filtered train)
 #### Train
-```{r}
+```{r fig.height=5}
 if (algo.LARS.caret == TRUE){
   set.seed(1)
   returned = train.caret.glmselect(formula = formula
@@ -1113,7 +1158,7 @@ if (algo.LARS.caret == TRUE){
 
 
 #### Test
-```{r}
+```{r fig.height=5}
 if (algo.LARS.caret == TRUE){
   test.model(model.LARS.caret, data.test
              ,method = 'lars',subopt = NULL
