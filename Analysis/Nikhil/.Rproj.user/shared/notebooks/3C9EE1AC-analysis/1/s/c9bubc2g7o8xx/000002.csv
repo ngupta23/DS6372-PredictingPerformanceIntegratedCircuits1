@@ -1,7 +1,0 @@
-"0","#str(data)"
-"0","if (log.pred == TRUE){"
-"0","  data[label.names] = log(data[alt.scale.label.name],10)"
-"0","  #drops = c(alt.scale.label.name)"
-"0","  #data = data[!(names(data) %in% drops)]"
-"0","}"
-"0","#str(data)"
