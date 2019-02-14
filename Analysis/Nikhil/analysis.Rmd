@@ -9,8 +9,12 @@ output:
    toc_depth: 5
 params:
   output.var: 'y3'
-  transform.abs: FALSE
-  log.pred: FALSE
+  trans: 0 
+  # Transformations: 
+  # 0 for no transformaton, 
+  # 1 for back to ABS scale, 
+  # 2 for log, 
+  # 3 for BestTransform (Norm)
   eda: FALSE
   algo.forward: FALSE
   algo.backward: FALSE
@@ -19,10 +23,10 @@ params:
   algo.LARS: FALSE
   
   algo.forward.caret: TRUE
-  algo.backward.caret: TRUE
-  algo.stepwise.caret: TRUE
-  algo.LASSO.caret: TRUE
-  algo.LARS.caret: TRUE
+  algo.backward.caret: FALSE
+  algo.stepwise.caret: FALSE
+  algo.LASSO.caret: FALSE
+  algo.LARS.caret: FALSE
 ---
 
 ```{r setup, include=FALSE}
@@ -34,45 +38,29 @@ sessionInfo()
 ```
 
 ```{r include=FALSE}
-# # https://gist.github.com/smithdanielle/9913897
-# check.packages <- function(pkg){
-#     new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-#     if (length(new.pkg))
-#         install.packages(new.pkg, dependencies = TRUE)
-#     #sapply(pkg, require, character.only = TRUE)
-#     sapply(pkg, library, character.only = TRUE) # see comment below in GitHub repo
-# }
-# 
-# # Usage example
-# packages<-c("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel")
-# check.packages(packages)
-
-# library(dplyr)
-# library(DT)
-# library(mosaic)
-# library(MASS)
-# library(usdm) #for multicollinearity
-# library(tidyverse)
-# library(ggplot2)
-# library(PerformanceAnalytics)
-# library(caTools)
-# library(glmnet)
-# library(caret)
-# library(leaps)
-# library(doParallel)
-
-
 #This line of code installs the pacman page if you do not have it installed - if you do, it simply loads the package
 if(!require(pacman))install.packages("pacman")
-pacman::p_load("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel","lars")
+pacman::p_load("dplyr", "DT", "mosaic", "MASS", "usdm", "tidyverse", "ggplot2", "PerformanceAnalytics", "caTools", "glmnet", "caret","leaps","doParallel","lars","reshape2", "ggforce","rlist", "bestNormalize")
 
 ```
 
 # User Inputs
 ```{r User Inputs}
 output.var = params$output.var 
-transform.abs = params$transform.abs
-log.pred = params$log.pred
+
+transform.abs = FALSE
+log.pred = FALSE
+norm.pred = FALSE
+if (params$trans == 1){
+  transform.abs == TRUE
+}else if (params$trans == 2){
+  log.pred = TRUE
+}else if (params$trans == 3){
+  norm.pred = TRUE  
+}else{
+  message("You have chosen no transformation")
+}
+
 eda = params$eda
 algo.forward = params$algo.forward
 algo.backward = params$algo.backward
@@ -99,9 +87,13 @@ if (log.pred == TRUE){
   label.names = paste('log.',output.var,sep="")
   alt.scale.label.name = output.var
 }
-if (log.pred == FALSE){
+if (log.pred == FALSE & norm.pred==FALSE){
   label.names = output.var
   alt.scale.label.name = paste('log.',output.var,sep="")
+}
+if (norm.pred==TRUE){
+  label.names = paste('norm.',output.var,sep="")
+  alt.scale.label.name = output.var
 }
 ```
 
@@ -153,6 +145,7 @@ feature.names = feature.names[!(feature.names %in% drops)]
 ```{r}
 labels = read.csv("../../Data/labels.csv")
 #str(labels)
+labels = labels[complete.cases(labels),]
 labels = labels[,c("JobName", output.var)]
 summary(labels)
 ```
@@ -169,13 +162,19 @@ data = data[,(!colnames(data) %in% drops)]
 ```{r Transformations}
 if (transform.abs == TRUE){
   data[,label.names] = 10^(data[,label.names]/20)
-  data = filter(data, y3 < 1E7)
+  #data = filter(data, y3 < 1E7)
 }
-
-
-#str(data)
 if (log.pred == TRUE){
   data[label.names] = log(data[alt.scale.label.name],10)
+  
+  drops = c(alt.scale.label.name)
+  data = data[!(names(data) %in% drops)]
+}
+
+t = NULL # initializw to NULL for other cases
+if (norm.pred == TRUE){
+  t = bestNormalize::bestNormalize(data[[alt.scale.label.name]])
+  data[label.names] = predict(t)
   
   drops = c(alt.scale.label.name)
   data = data[!(names(data) %in% drops)]
@@ -395,8 +394,19 @@ train.caret.glmselect = function(formula, data, method
   
     model = model.caret$finalModel
 
-    # Residuals Plot  MMORO #
-    # leap function doens support studentized residuals
+    # Metrics Plot 
+    dataPlot = model.caret$results %>%
+      gather(key='metric',value='value',-nvmax) %>%
+      dplyr::filter(metric %in% c('MAE','RMSE','Rsquared'))
+    metricsPlot = ggplot(data=dataPlot,aes(x=nvmax,y=value) ) +
+      geom_line(color='lightblue4') +
+      geom_point(color='blue',alpha=0.7,size=.9) +
+      facet_wrap(~metric,ncol=4,scales='free_y')+
+      theme_light()
+    plot(metricsPlot)
+    
+    # Residuals Plot
+    # leap function does not support studentized residuals
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
@@ -414,50 +424,61 @@ train.caret.glmselect = function(formula, data, method
     id = rownames(model.caret$bestTune)
     message("Coefficients of final model:")
     print (coef(model, id = id))
-    # Need to find alternate to plotting diagnostic plots
-    # plot.diagnostics(model.forward,data.train)
-    # plot(model.forward,labels = colnames(data.train),scale=c("bic")) ## too many variables
-    return(list(model = model,id = id,residPlot = residPlot ,residHistogram=residHistogram))
+    
+    return(list(model = model,id = id, residPlot = residPlot, residHistogram=residHistogram))
   }
   if (method == 'glmnet' && subopt == 'LASSO'){
     print(model.caret)
     print(plot(model.caret))
     print(model.caret$bestTune)
     
-    # Metrics Plot MMORO#
-    dataPlot = cbind(model.caret$results, id=as.numeric(rownames(model.caret$results))) %>%
-      gather(key='metric',value='value',-id) %>%
+    print(model.caret$results)
+    
+    # Metrics Plot 
+    dataPlot = model.caret$results %>%
+      gather(key='metric',value='value',-lambda) %>%
       dplyr::filter(metric %in% c('MAE','RMSE','Rsquared'))
-    metricsPlot = ggplot(data=dataPlot,aes(x=id,y=value) ) +
+    metricsPlot = ggplot(data=dataPlot,aes(x=lambda,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
       facet_wrap(~metric,ncol=4,scales='free_y')+
       theme_light()
     plot(metricsPlot)
     
-    # Residuals Plot MMORO#
+    # Residuals Plot 
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
       geom_smooth()+
       theme_light()
     plot(residPlot)
-    
+
     residHistogram = ggplot(dataPlot,aes(x=res)) +
       geom_histogram(aes(y=..density..),fill='light blue',alpha=1) +
-      geom_density(color='lightblue4') + 
+      geom_density(color='lightblue4') +
       theme_light()
     plot(residHistogram)
 
-        id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id,residPlot = residPlot,metricsPlot=metricsPlot ))
+    id = NULL # not really needed but added for consistency
+    return(list(model = model.caret,id = id, residPlot = residPlot, metricsPlot=metricsPlot ))
   }
   if (method == 'lars'){
     print(model.caret)
     print(plot(model.caret))
     print(model.caret$bestTune)
     
-    # Residuals Plot  MMORO#
+    # Metrics Plot
+    dataPlot = model.caret$results %>%
+        gather(key='metric',value='value',-fraction) %>%
+      dplyr::filter(metric %in% c('MAE','RMSE','Rsquared'))
+    metricsPlot = ggplot(data=dataPlot,aes(x=fraction,y=value) ) +
+      geom_line(color='lightblue4') +
+      geom_point(color='blue',alpha=0.7,size=.9) +
+      facet_wrap(~metric,ncol=4,scales='free_y')+
+      theme_light()
+    plot(metricsPlot)
+    
+    # Residuals Plot
     dataPlot=data.frame(pred=predict(model.caret,data),res=resid(model.caret))
     residPlot = ggplot(dataPlot,aes(x=pred,y=res)) +
       geom_point(color='light blue',alpha=0.7) +
@@ -472,12 +493,12 @@ train.caret.glmselect = function(formula, data, method
     plot(residHistogram)
 
     id = NULL # not really needed but added for consistency
-    return(list(model = model.caret,id = id,residPlot = residPlot ,residHistogram=residHistogram))
+    return(list(model = model.caret,id = id, residPlot = residPlot, residHistogram=residHistogram))
   }
 }
 
 # https://stackoverflow.com/questions/48265743/linear-model-subset-selection-goodness-of-fit-with-k-fold-cross-validation
-# changes slightly since call[[2]] was just returning "formula" without actually returnign the value in formula
+# changed slightly since call[[2]] was just returning "formula" without actually returnign the value in formula
 predict.regsubsets <- function(object, newdata, id, formula, ...) {
     #form <- as.formula(object$call[[2]])
     mat <- model.matrix(formula, newdata) # adds intercept and expands any interaction terms
@@ -489,10 +510,10 @@ predict.regsubsets <- function(object, newdata, id, formula, ...) {
 test.model = function(model, test, level=0.95
                       ,draw.limits = FALSE, good = 0.1, ok = 0.15
                       ,method = NULL, subopt = NULL
-                      ,id = NULL, formula, feature.names, label.names){
+                      ,id = NULL, formula, feature.names, label.names
+                      ,transformation = NULL){
   ## if using caret for glm select equivalent functionality, 
-  ## need to set regsubset = TRUE, pass id of best model through id variable, 
-  ## and pass formula (full is ok as it will select subset of variables from there)
+  ## need to pass formula (full is ok as it will select subset of variables from there)
   if (is.null(method)){
     pred = predict(model, newdata=test, interval="confidence", level = level) 
   }
@@ -516,8 +537,26 @@ test.model = function(model, test, level=0.95
 
   test.mse = mean((test[,label.names]-pred[,1])^2)
   print (paste(method, subopt, "Test MSE:", test.mse, sep=" "))
+  
+  if(log.pred == TRUE || norm.pred == TRUE){
+    # plot transformewd comparison first
+    plot(test[,label.names],pred[,1],xlab = "Actual (Transformed)", ylab = "Predicted (Transformed)")
+  }
+    
+  if (log.pred == FALSE && norm.pred == FALSE){
+    x = test[,label.names]
+    y = pred[,1]
+  }
+  if (log.pred == TRUE){
+    x = 10^test[,label.names]
+    y = 10^pred[,1]  
+  }
+  if (norm.pred == TRUE){
+    x = predict(transformation, test[,label.names], inverse = TRUE)
+    y = predict(transformation, pred[,1], inverse = TRUE)
+  }
 
-  plot(test[,label.names],pred[,1],xlab = "Actual", ylab = "Predicted")
+  plot(x, y, xlab = "Actual", ylab = "Predicted")
   abline(0,(1+good),col='green', lwd = 3)
   abline(0,(1-good),col='green', lwd = 3)
   abline(0,(1+ok),col='blue', lwd = 3)
@@ -529,8 +568,22 @@ test.model = function(model, test, level=0.95
 ## Setup Formulae
 ```{r}
 n <- names(data.train)
-formula <- as.formula(paste(paste(n[n %in% label.names], collapse = " + ")," ~", paste(n[!n %in% label.names], collapse = " + "))) 
+ formula <- as.formula(paste(paste(n[n %in% label.names], collapse = " + ")," ~", paste(n[!n %in% label.names], collapse = " + "))) 
+
+# ind.interact = c("x4","x7","x8", "x9", "x10", "x11", "x14", "x16", "x17", "x21", "sqrt.x18")
+# ind.nointeract = c("stat13", "stat14", "stat24", "stat60", "stat98", "stat110", "stat144", "stat149")
+# 
+# interact = paste(ind.interact, collapse = " + ")
+# nointeract = paste(ind.nointeract, collapse = " + ")
+# 
+# # ^2 is 2 way interaction, ^3 is 3 way interaction
+# formula <- as.formula(paste(paste(n[n %in% label.names], collapse = " + "), "~ (", interact, " )^2 ", " + ", nointeract ))
+# 
+# # # * is all way interaction
+# # formula <- as.formula(paste(paste(n[n %in% label.names], collapse = " + "), "~ (", interact, " ) ", " + ", nointeract ))
+
 grand.mean.formula = as.formula(paste(paste(n[n %in% label.names], collapse = " + ")," ~ 1"))
+
 print(formula)
 print(grand.mean.formula)
 
@@ -538,7 +591,7 @@ print(grand.mean.formula)
 feature.names = n[!n %in% label.names]
 ```
 
-## Full & Grand Means Model
+## Full Model
 
 ```{r Full Model}
 model.full = lm(formula , data.train)
@@ -554,10 +607,9 @@ model.full2 = lm(formula , data.train2)
 summary(model.full2)
 cd.full2 = plot.diagnostics(model.full2, data.train2)
 
-
 # much more normal residuals than before. 
-# See if you can check the distribution (boxplots) of the high leverage points and the other points
-# High Leverage Plot MMORO ### 
+# Checking to see if distributions are different and if so whcih variables
+# High Leverage Plot 
 plotData = data.train %>% 
   rownames_to_column() %>%
   mutate(type=ifelse(rowname %in% high.cd,'High','Normal')) %>%
@@ -568,19 +620,46 @@ ggplot(data=plotData, aes(x=type,y=target)) +
   scale_y_continuous(name="Target Variable Values") +
   theme_light() +
   ggtitle('Distribution of High Leverage Points and Normal  Points')
+
+plotData = data.train %>% 
+  rownames_to_column() %>%
+  mutate(type=ifelse(rowname %in% high.cd,'High','Normal')) %>%
+  dplyr::select(type,one_of(feature.names))
+
 ```
 
 ```{r}
+# 2 sample t-tests
+comp.test = lapply(dplyr::select(plotData, one_of(feature.names)), function(x) t.test(x ~ plotData$type, var.equal = TRUE)) 
+
+sig.comp = list.filter(comp.test, p.value < 0.05)
+sapply(sig.comp, function(x) x[['p.value']])
+
+```
+
+
+```{r}
+# Distribution (box) Plots
+mm = melt(plotData, id=c('type'))
+
+ggplot(mm) +
+  geom_boxplot(aes(x=type, y=value))+
+  facet_wrap(~variable, ncol=16, scales = 'free') +
+  ggtitle('Distribution of High Leverage Points and Normal Points')
+
+title = paste("comparison_trans",params$trans,'.jpeg', sep="")
+ggsave(title, width =100, height = 200, units='cm',limitsize = FALSE)
+```
+
+## Grand Means Model
+```{r}
 model.null = lm(grand.mean.formula, data.train)
-# summary(model.null)
-# plot.diagnostics(model.null, data.train)
 ```
 
 ```{r}
 model.null2 = lm(grand.mean.formula, data.train2)
-# summary(model.null2)
-# plot.diagnostics(model.null2, data.train2)
 ```
+
 ## Variable Selection 
 Basic: http://www.stat.columbia.edu/~martin/W2024/R10.pdf 
 Cross Validation + Other Metrics: http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/154-stepwise-regression-essentials-in-r/
@@ -594,8 +673,7 @@ if (algo.forward == TRUE){
   
   model.forward = step(model.null, scope=list(lower=model.null, upper=model.full), direction="forward", trace = 0)
   print(summary(model.forward))
-  #saveRDS(model.forward,file = "model_forward.rds")
-  
+
   t2 = Sys.time()
   print (paste("Time taken for Forward Selection: ",t2-t1, sep = ""))
   
@@ -619,8 +697,7 @@ if (algo.forward == TRUE){
   
   model.forward2 = step(model.null2, scope=list(lower=model.null2, upper=model.full2), direction="forward", trace = 0)
   print(summary(model.forward2))
-  #saveRDS(model.forward,file = "model_forward.rds")
-  
+
   t2 = Sys.time()
   print (paste("Time taken for Forward Selection: ",t2-t1, sep = ""))
   
@@ -658,8 +735,9 @@ if (algo.forward.caret == TRUE){
              ,method = 'leapForward',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
+
 ```
 
 ### Forward Selection with CV (w/ filtered train)
@@ -684,7 +762,7 @@ if (algo.forward.caret == TRUE){
              ,method = 'leapForward',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -698,8 +776,7 @@ if (algo.backward == TRUE){
   
   model.backward = step(model.full, data = data.train, direction="backward", trace = 0)
   print(summary(model.backward))
-  #saveRDS(model.forward,file = "model_backward.rds")
-  
+
   t2 = Sys.time()
   print (paste("Time taken for Backward Elimination: ",t2-t1, sep = ""))
   
@@ -735,7 +812,7 @@ if (algo.backward.caret == TRUE){
              ,method = 'leapBackward',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -760,7 +837,7 @@ if (algo.backward.caret == TRUE){
              ,method = 'leapBackward',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -773,8 +850,7 @@ if (algo.stepwise == TRUE){
   
   model.stepwise = step(model.null, scope=list(upper=model.full), data = data.train, direction="both", trace = 0)
   print(summary(model.stepwise))
-  #saveRDS(model.stepwise,file = "model_stepwise.rds")
-  
+
   t2 = Sys.time()
   print (paste("Time taken for Stepwise Selection: ",t2-t1, sep = ""))
   
@@ -798,8 +874,7 @@ if (algo.stepwise == TRUE){
   
   model.stepwise2 = step(model.null2, scope=list(upper=model.full2), data = data.train2, direction="both", trace = 0)
   print(summary(model.stepwise2))
-  #saveRDS(model.forward,file = "model_stepwise.rds")
-  
+
   t2 = Sys.time()
   print (paste("Time taken for Stepwise Selection: ",t2-t1, sep = ""))
   
@@ -832,12 +907,11 @@ if (algo.stepwise.caret == TRUE){
 #### Test
 ```{r}
 if (algo.stepwise.caret == TRUE){
-  # test.model(model.stepwise, data.test, "Stepwise Selection", draw.limits = TRUE, regsubset = TRUE, id = id, formula = formula)
   test.model(model.stepwise, data.test
              ,method = 'leapSeq',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
   
 }
 ```
@@ -864,7 +938,7 @@ if (algo.stepwise.caret == TRUE){
              ,method = 'leapSeq',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -967,7 +1041,7 @@ if (algo.LASSO.caret == TRUE){
   test.model(model.LASSO.caret, data.test
              ,method = 'glmnet',subopt = "LASSO"
              ,formula = formula, feature.names = feature.names, label.names = label.names
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -993,7 +1067,7 @@ if (algo.LASSO.caret == TRUE){
   test.model(model.LASSO.caret, data.test
              ,method = 'glmnet',subopt = "LASSO"
              ,formula = formula, feature.names = feature.names, label.names = label.names
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -1019,7 +1093,7 @@ if (algo.LARS.caret == TRUE){
   test.model(model.LARS.caret, data.test
              ,method = 'lars',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
@@ -1044,7 +1118,7 @@ if (algo.LARS.caret == TRUE){
   test.model(model.LARS.caret, data.test
              ,method = 'lars',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
-             ,draw.limits = TRUE)
+             ,draw.limits = TRUE, transformation = t)
 }
 ```
 
