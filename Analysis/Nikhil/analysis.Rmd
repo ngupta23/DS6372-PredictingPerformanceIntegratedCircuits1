@@ -638,7 +638,7 @@ sapply(sig.comp, function(x) x[['p.value']])
 ```
 
 
-```{r}
+```{r fig.height=100}
 # Distribution (box) Plots
 mm = melt(plotData, id=c('type'))
 
@@ -647,8 +647,8 @@ ggplot(mm) +
   facet_wrap(~variable, ncol=16, scales = 'free') +
   ggtitle('Distribution of High Leverage Points and Normal Points')
 
-title = paste("comparison_trans",params$trans,'.jpeg', sep="")
-ggsave(title, width =100, height = 200, units='cm',limitsize = FALSE)
+# title = paste("comparison_trans",params$trans,'.jpeg', sep="")
+# ggsave(title, width =100, height = 200, units='cm',limitsize = FALSE)
 ```
 
 ## Grand Means Model
