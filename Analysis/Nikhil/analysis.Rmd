@@ -413,9 +413,9 @@ train.caret.glmselect = function(formula, data, method
   registerDoSEQ() # register sequential engine in case you are not using this function anymore
   
   if (method == 'leapForward' | method == 'leapBackward' | method == 'leapSeq'){
-    h4("All models results")
+    print("All models results")
     print(model.caret$results) # all model results
-    h4("Best Model")
+    print("Best Model")
     print(model.caret$bestTune) # best model
     
     model = model.caret$finalModel
@@ -450,7 +450,7 @@ train.caret.glmselect = function(formula, data, method
     # Provides the coefficients of the best model
     # regsubsets doens return a full model (see documentation of regsubset), so we need to recalcualte themodel
     # https://stackoverflow.com/questions/13063762/how-to-obtain-a-lm-object-from-regsubsets
-    h4("Coefficients of final model:")
+    print("Coefficients of final model:")
     coefs <- coef(model, id=id)
     #calculate the model to the the coef intervals
     nams <- names(coefs)
@@ -496,11 +496,12 @@ train.caret.glmselect = function(formula, data, method
       theme_light()
     plot(residHistogram)
     
-    h4("Coefficients") 
+    print("Coefficients") 
     #no interval for glmnet https://stackoverflow.com/questions/39750965/confidence-intervals-for-ridge-regression
     
     t=coef(model,s=model.caret$bestTune$lambda)
-    t[which(t[,1]!=0),]
+    model.coef = t[which(t[,1]!=0),]
+    print(as.data.frame(model.coef))
     id = NULL # not really needed but added for consistency
     return(list(model = model.caret,id = id, residPlot = residPlot, metricsPlot=metricsPlot ))
   }
@@ -534,9 +535,10 @@ train.caret.glmselect = function(formula, data, method
       theme_light()
     plot(residHistogram)
     
-    h4("Coefficients") 
-    t=coef(model,s=model.caret$bestTune$lambda)
-    t[which(t[,1]>0),]
+    print("Coefficients") 
+    t=coef(model.caret$finalModel,s=model.caret$bestTune$fraction,mode='fraction')
+    model.coef = t[which(t!=0)]
+    print(model.coef)
     id = NULL # not really needed but added for consistency
     return(list(model = model.caret,id = id, residPlot = residPlot, residHistogram=residHistogram))
   }
@@ -1070,6 +1072,7 @@ if(algo.LASSO == TRUE){
 ```{r fig.height=5}
 if (algo.LASSO.caret == TRUE){
   set.seed(1)
+  debugonce(train.caret.glmselect)
   returned = train.caret.glmselect(formula = formula
                                    ,data =  data.train
                                    ,method = "glmnet"
