@@ -685,13 +685,13 @@ sapply(sig.comp, function(x) x[['p.value']])
 ```
 
 
-```{r fig.height=100}
+```{r fig.height=70}
 # Distribution (box) Plots
 mm = melt(plotData, id=c('type'))
 
 ggplot(mm) +
   geom_boxplot(aes(x=type, y=value))+
-  facet_wrap(~variable, ncol=16, scales = 'free') +
+  facet_wrap(~variable, ncol=8, scales = 'free') +
   ggtitle('Distribution of High Leverage Points and Normal Points')
 
 # title = paste("comparison_trans",params$trans,'.jpeg', sep="")
@@ -1073,10 +1073,12 @@ if(algo.LASSO == TRUE){
 if (algo.LASSO.caret == TRUE){
   set.seed(1)
   debugonce(train.caret.glmselect)
+  tune.grid= expand.grid(alpha = 1,lambda = 10^seq(from=-4,to=0,length=100))
   returned = train.caret.glmselect(formula = formula
                                    ,data =  data.train
                                    ,method = "glmnet"
                                    ,subopt = 'LASSO'
+                                   ,tune.grid = tune.grid
                                    ,feature.names = feature.names)
   model.LASSO.caret = returned$model
 }

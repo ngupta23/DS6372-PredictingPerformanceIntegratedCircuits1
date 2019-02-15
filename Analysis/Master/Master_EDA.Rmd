@@ -128,8 +128,8 @@ The orderNorm transromation can help (see [Best Normalizator] section)
 
 Histogram and QQ plot
 
-```{r fig.height=6}
-cols = c('x11','x18','stat98','x7')
+```{r fig.height=9}
+cols = c('x11','x18','stat98','x7','stat110')
 ggplot(gather(select_at(data,cols)), aes(value)) + 
   geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
   geom_density() + 
