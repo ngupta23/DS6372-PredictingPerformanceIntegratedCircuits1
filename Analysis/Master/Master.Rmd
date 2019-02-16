@@ -292,20 +292,20 @@ plot.diagnostics <-  function(model, train) {
   df = data.frame(x=predict(model,train),y=r.student)
   p=ggplot(data=df,aes(x=x,y=y)) +
     geom_point(color='blue',alpha=0.5,shape=20,size=2) +
-    geom_hline(yintercept = 0,size=1)+
-    ylab("Student Residuals") +
-    xlab("Predicted Values")+
-    ggtitle("Student Residual Plot")
-  plot(p)
-  
-  df = data.frame(x=predict(model,train),y=r.standard)
-  p=ggplot(data=df,aes(x=x,y=y)) +
-    geom_point(color='blue',alpha=0.5,shape=20,size=2) +
     geom_hline(yintercept = c(-2,0,2),size=1)+
     ylab("Student Residuals") +
     xlab("Predicted Values")+
-    ggtitle("Student Residual Plot")
+    ggtitle("Standardized Residual Plot")
   plot(p)
+  
+  # df = data.frame(x=predict(model,train),y=r.standard)
+  # p=ggplot(data=df,aes(x=x,y=y)) +
+  #   geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+  #   geom_hline(yintercept = c(-2,0,2),size=1)+
+  #   ylab("Standardized Residuals") +
+  #   xlab("Predicted Values")+
+  #   ggtitle("Student Residual Plot")
+  # plot(p)
   # Histogram
   df=data.frame(r.student)
   p=ggplot(data=df,aes(r.student)) +
@@ -431,7 +431,7 @@ train.caret.glmselect = function(formula, data, method
     metricsPlot = ggplot(data=dataPlot,aes(x=nvmax,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
-      facet_wrap(~metric,ncol=2,scales='free_y')+
+      facet_wrap(~metric,ncol=2,scales='free')+
       theme_light()
     plot(metricsPlot)
     
@@ -483,7 +483,7 @@ train.caret.glmselect = function(formula, data, method
     metricsPlot = ggplot(data=dataPlot,aes(x=lambda,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
-      facet_wrap(~metric,ncol=2,scales='free_y')+
+      facet_wrap(~metric,ncol=2,scales='free')+
       theme_light()
     plot(metricsPlot)
     
@@ -523,7 +523,7 @@ train.caret.glmselect = function(formula, data, method
     metricsPlot = ggplot(data=dataPlot,aes(x=fraction,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
-      facet_wrap(~metric,ncol=2,scales='free_y')+
+      facet_wrap(~metric,ncol=2,scales='free')+
       theme_light()
     plot(metricsPlot)
     
