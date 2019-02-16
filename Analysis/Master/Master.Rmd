@@ -809,7 +809,7 @@ if (algo.stepwise.caret == TRUE){
 ```{r Lasso, fig.height=5}
 if (algo.LASSO.caret == TRUE){
   set.seed(1)
-  tune.grid= expand.grid(alpha = 1,lambda = 10^seq(from=-4,to=0,length=100))
+  tune.grid= expand.grid(alpha = 1,lambda = 10^seq(from=-4,to=-2,length=100))
   returned = train.caret.glmselect(formula = formula
                                    ,data =  data.train
                                    ,method = "glmnet"
