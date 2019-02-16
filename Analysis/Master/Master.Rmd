@@ -71,6 +71,7 @@ data = data.ori[cc,] %>% select_at(c(predictors,output.var,'JobName'))
 message('Original cases: ',nrow(data.ori))
 message('Non-Complete cases: ',nrow(data.notComplete))
 message('Complete cases: ',nrow(data))
+summary(dplyr::select_at(data,c('JobName',output.var)))
 ```
 
 # Output Variable
@@ -80,10 +81,11 @@ The Output Variable **`r output.var`** shows right skewness, so will proceed wit
 ## Histogram
 
 ```{r histogram_y, fig.height=3}
-ggplot(gather(select_at(data,output.var)), aes(value)) + 
+df=gather(select_at(data,output.var))
+ggplot(df, aes(x=value)) + 
   geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
-  geom_density() + 
-  facet_wrap(~key, scales = 'free',ncol=4)
+  geom_density() 
+  #stat_function(fun = dnorm, n = 100, args = list(mean = mean(df$value), sd = sd(df$value)))  
 
 ```
 
@@ -102,10 +104,11 @@ ggplot(gather(select_at(data,output.var)), aes(sample=value)) +
 ```{r Trans Output, fig.height=4}
 if(log.pred==TRUE) data[[output.var.tr]] = log(data[[output.var]],10) else
   data[[output.var.tr]] = data[[output.var]]
-
-ggplot(gather(select_at(data,c(output.var,output.var.tr))), aes(value)) + 
+df=gather(select_at(data,c(output.var,output.var.tr)))
+ggplot(df, aes(value)) + 
   geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
   geom_density() + 
+  # stat_function(fun = dnorm, n = 100, args = list(mean = mean(df$value), sd = sd(df$value)))  
   facet_wrap(~key, scales = 'free',ncol=2)
 
 ggplot(gather(select_at(data,c(output.var,output.var.tr))), aes(sample=value)) + 
@@ -140,9 +143,11 @@ Histograms
 
 ```{r Histo Interest Pred, fig.height=6}
 cols = c('x11','x18','stat98','x7','stat110')
-ggplot(gather(select_at(data,cols)), aes(value)) + 
+df=gather(select_at(data,cols))
+ggplot(df, aes(value)) + 
   geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
   geom_density() + 
+  # stat_function(fun = dnorm, n = 100, args = list(mean = mean(df$value), sd = sd(df$value)))  
   facet_wrap(~key, scales = 'free',ncol=3)
 
 # ggplot(gather(select_at(data,cols)), aes(sample=value)) + 
@@ -170,9 +175,11 @@ ggplot(data=d, aes_string(x='value',y=output.var.tr)) +
 All indicators have a strong indication of  **Fat-Tails**
 
 ```{r Histogram All, fig.height=70, fig.width=7, cache=TRUE}
-ggplot(gather(select_at(data,predictors)), aes(value)) + 
+df=gather(select_at(data,predictors))
+ggplot(df, aes(value)) + 
   geom_histogram(aes(y=..density..),bins = 50,fill='light blue') + 
   geom_density() + 
+  # stat_function(fun = dnorm, n = 100, args = list(mean = mean(df$value), sd = sd(df$value)))  
   facet_wrap(~key, scales = 'free',ncol=4)
 ```
 
@@ -301,9 +308,9 @@ plot.diagnostics <-  function(model, train) {
   plot(p)
   # Histogram
   df=data.frame(r.student)
- p=ggplot(data=df,aes(r.student)) +
+  p=ggplot(data=df,aes(r.student)) +
     geom_histogram(aes(y=..density..),bins = 50,fill='blue',alpha=0.6) + 
-    stat_function(fun = dnorm, n = 100, args = list(mean = 0, sd = 1),size=1) +
+    stat_function(fun = dnorm, n = 100, args = list(mean = 0, sd = 1)) +
     ylab("Density")+
     xlab("Studentized Residuals")+
     ggtitle("Distribution of Studentized Residuals")
@@ -393,7 +400,7 @@ train.caret.glmselect = function(formula, data, method
   }
   
   # http://sshaikh.org/2015/05/06/parallelize-machine-learning-in-r-with-multi-core-cpus/
-  cl <- makeCluster(detectCores()*0.75) # use 75% of cores only, leave rest for other tasks
+  cl <- makeCluster(ceiling(detectCores()*0.85)) # use 75% of cores only, leave rest for other tasks
   registerDoParallel(cl)
 
   set.seed(1) 
@@ -424,7 +431,7 @@ train.caret.glmselect = function(formula, data, method
     metricsPlot = ggplot(data=dataPlot,aes(x=nvmax,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
-      facet_wrap(~metric,ncol=4,scales='free_y')+
+      facet_wrap(~metric,ncol=2,scales='free_y')+
       theme_light()
     plot(metricsPlot)
     
@@ -439,7 +446,9 @@ train.caret.glmselect = function(formula, data, method
    
     residHistogram = ggplot(dataPlot,aes(x=res)) +
       geom_histogram(aes(y=..density..),fill='light blue',alpha=1) +
-      geom_density(color='lightblue4') + 
+      #geom_density(color='lightblue4') + 
+      stat_function(fun = dnorm, n = 100, args = list(mean = mean(dataPlot$res)
+                                                       , sd = sd(dataPlot$res)),color='lightblue4')  
       theme_light()
     plot(residHistogram)
     id = rownames(model.caret$bestTune)    
@@ -474,7 +483,7 @@ train.caret.glmselect = function(formula, data, method
     metricsPlot = ggplot(data=dataPlot,aes(x=lambda,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
-      facet_wrap(~metric,ncol=4,scales='free_y')+
+      facet_wrap(~metric,ncol=2,scales='free_y')+
       theme_light()
     plot(metricsPlot)
     
@@ -488,7 +497,9 @@ train.caret.glmselect = function(formula, data, method
 
     residHistogram = ggplot(dataPlot,aes(x=res)) +
       geom_histogram(aes(y=..density..),fill='light blue',alpha=1) +
-      geom_density(color='lightblue4') +
+      #geom_density(color='lightblue4') +
+      stat_function(fun = dnorm, n = 100, args = list(mean = mean(dataPlot$res)
+                                                       , sd = sd(dataPlot$res)),color='lightblue4')  
       theme_light()
     plot(residHistogram)
     
@@ -512,7 +523,7 @@ train.caret.glmselect = function(formula, data, method
     metricsPlot = ggplot(data=dataPlot,aes(x=fraction,y=value) ) +
       geom_line(color='lightblue4') +
       geom_point(color='blue',alpha=0.7,size=.9) +
-      facet_wrap(~metric,ncol=4,scales='free_y')+
+      facet_wrap(~metric,ncol=2,scales='free_y')+
       theme_light()
     plot(metricsPlot)
     
@@ -526,7 +537,9 @@ train.caret.glmselect = function(formula, data, method
 
     residHistogram = ggplot(dataPlot,aes(x=res)) +
       geom_histogram(aes(y=..density..),fill='light blue',alpha=1) +
-      geom_density(color='lightblue4') + 
+      #geom_density(color='lightblue4') + 
+      stat_function(fun = dnorm, n = 100, args = list(mean = mean(dataPlot$res)
+                                                       , sd = sd(dataPlot$res)),color='lightblue4')  
       theme_light()
     plot(residHistogram)
     
@@ -582,8 +595,13 @@ test.model = function(model, test, level=0.95
   
   if(log.pred == TRUE || norm.pred == TRUE){
     # plot transformewd comparison first
-    plot(test[,label.names],pred[,1],xlab = "Actual (Transformed)", ylab = "Predicted (Transformed)")
-    abline(coef=c(0,1),col='blue')
+    df=data.frame(x=test[,label.names],y=pred[,1])
+    ggplot(df,aes(x=x,y=y)) +
+      geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+      geom_abline(slope=1,intercept=0,color='black',size=1) +
+      #scale_y_continuous(limits=c(min(df),max(df)))+
+      xlab("Actual (Transformed)")+
+      ylab("Predicted (Transformed)")
   }
     
   if (log.pred == FALSE && norm.pred == FALSE){
@@ -599,12 +617,16 @@ test.model = function(model, test, level=0.95
     y = predict(transformation, pred[,1], inverse = TRUE)
   }
 
-  plot(x, y, xlab = "Actual", ylab = "Predicted")
-  abline(0,(1+good),col='green', lwd = 3)
-  abline(0,(1-good),col='green', lwd = 3)
-  abline(0,(1+ok),col='blue', lwd = 3)
-  abline(0,(1-ok),col='blue', lwd = 3)
-  
+  df=data.frame(x,y)
+  ggplot(df,aes(x,y)) +
+    geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+    geom_abline(slope=c(1+good,1-good,1+ok,1-ok)
+                ,intercept=rep(0,4),color=c('dark green','dark green','dark red','dark red'),size=1,alpha=0.8) +
+    #scale_y_continuous(limits=c(min(df),max(df)))+
+    xlab("Actual")+
+    ylab("Predicted") 
+    
+ 
 }
 ```
 
@@ -653,20 +675,30 @@ ggplot(data=plotData, aes(x=type,y=target)) +
   theme_light() +
   ggtitle('Distribution of High Leverage Points and Normal  Points')
 
-plotData = data.train %>% 
-  rownames_to_column() %>%
-  mutate(type=ifelse(rowname %in% high.cd,'High','Normal')) %>%
-  dplyr::select(type,one_of(feature.names))
 
 ```
 
 ```{r 2SampleTest}
 # 2 sample t-tests
+
+plotData = data.train %>% 
+  rownames_to_column() %>%
+  mutate(type=ifelse(rowname %in% high.cd,'High','Normal')) %>%
+  dplyr::select(type,one_of(feature.names))
+
 comp.test = lapply(dplyr::select(plotData, one_of(feature.names))
                    , function(x) t.test(x ~ plotData$type, var.equal = TRUE)) 
 
 sig.comp = list.filter(comp.test, p.value < 0.05)
 sapply(sig.comp, function(x) x[['p.value']])
+
+mm = melt(plotData, id=c('type')) %>% filter(variable %in% names(sig.comp))
+
+ggplot(mm,aes(x=type, y=value)) +
+  geom_boxplot()+
+  facet_wrap(~variable, ncol=5, scales = 'free_y') +
+  scale_y_continuous(name="values",label=scales::comma_format(accuracy=.1)) +
+  ggtitle('Distribution of High Leverage Points and Normal Points')
 
 ```
 
@@ -675,8 +707,8 @@ sapply(sig.comp, function(x) x[['p.value']])
 # Distribution (box) Plots
 mm = melt(plotData, id=c('type'))
 
-ggplot(mm) +
-  geom_boxplot(aes(x=type, y=value))+
+ggplot(mm,aes(x=type, y=value)) +
+  geom_boxplot()+
   facet_wrap(~variable, ncol=8, scales = 'free_y') +
   scale_y_continuous(name="values",label=scales::comma_format(accuracy=.1)) +
   ggtitle('Distribution of High Leverage Points and Normal Points')
@@ -711,7 +743,7 @@ if (algo.forward.caret == TRUE){
 #### Test
 ```{r Forward Test, fig.height=5}
 if (algo.forward.caret == TRUE){
-    test.model(model.forward, data.test
+    test.model(model=model.forward, test=data.test
              ,method = 'leapForward',subopt = NULL
              ,formula = formula, feature.names = feature.names, label.names = label.names
              ,id = id
