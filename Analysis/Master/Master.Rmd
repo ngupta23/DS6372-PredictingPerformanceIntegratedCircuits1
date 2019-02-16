@@ -9,7 +9,6 @@ output:
    toc_float: true
    toc_depth: 3
  word_document:
-   
    reference_docx: word_template.docx
 params:
   output.var: 'y3'
@@ -21,7 +20,6 @@ params:
   algo.LARS.caret: TRUE
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(pacman) #manages autoinstallation of packages
@@ -31,7 +29,6 @@ pacman::p_load(usdm,tidyverse,ggplot2,PerformanceAnalytics,MASS,glmnet,investr,g
 
 options(width = 120)
 ```
-
 
 # User Inputs
 
@@ -49,7 +46,6 @@ algo.LARS.caret = params$algo.LARS.caret
 message("Parameters used for training/prediction: ")
 str(params)
 ```
-
 
 ```{r setup Labels}
 # Setup Labels
@@ -79,7 +75,7 @@ message('Complete cases: ',nrow(data))
 
 # Output Variable
 
-The Output Variable **`r output.var`** shows  right skewness, so will proceed with a log transofrmation
+The Output Variable **`r output.var`** shows right skewness, so will proceed with a log transformation
 
 ## Histogram
 
@@ -136,7 +132,7 @@ qqnorm(predict(t))
 # Predictors
 
 All predictors show a **Fat-Tail** situation, where the two tails are very tall, and a low distribution around the mean.
-The orderNorm transromation can help (see [Best Normalizator] section)
+The orderNorm transformation can help (see [Best Normalizator] section)
 
 ## Interesting Predictors
 
@@ -285,32 +281,33 @@ plot.diagnostics <-  function(model, train) {
   residuals = resid(model) # Plotted above in plot(lm.out)
   r.standard = rstandard(model)
   r.student = rstudent(model)
-
-  plot(predict(model,train),r.student,
-      ylab="Student Residuals", xlab="Predicted Values", 
-      main="Student Residual Plot") 
-  abline(0, 0)
   
-  plot(predict(model, train),r.standard,
-      ylab="Standard Residuals", xlab="Predicted Values", 
-      main="Standard Residual Plot") 
-  abline(0, 0)
-  abline(2, 0)
-  abline(-2, 0)
+  df = data.frame(x=predict(model,train),y=r.student)
+  p=ggplot(data=df,aes(x=x,y=y)) +
+    geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+    geom_hline(yintercept = 0,size=1)+
+    ylab("Student Residuals") +
+    xlab("Predicted Values")+
+    ggtitle("Student Residual Plot")
+  plot(p)
   
+  df = data.frame(x=predict(model,train),y=r.standard)
+  p=ggplot(data=df,aes(x=x,y=y)) +
+    geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+    geom_hline(yintercept = c(-2,0,2),size=1)+
+    ylab("Student Residuals") +
+    xlab("Predicted Values")+
+    ggtitle("Student Residual Plot")
+  plot(p)
   # Histogram
-  hist(r.student, freq=FALSE, main="Distribution of Studentized Residuals", 
-  xlab="Studentized Residuals", ylab="Density", ylim=c(0,0.5))
-
-  # Create range of x-values for normal curve
-  xfit <- seq(min(r.student)-1, max(r.student)+1, length=40)
-
-  # Generate values from the normal distribution at the specified values
-  yfit <- (dnorm(xfit))
-
-  # Add the normal curve
-  lines(xfit, yfit, ylim=c(0,0.5))
-  
+  df=data.frame(r.student)
+ p=ggplot(data=df,aes(r.student)) +
+    geom_histogram(aes(y=..density..),bins = 50,fill='blue',alpha=0.6) + 
+    stat_function(fun = dnorm, n = 100, args = list(mean = 0, sd = 1),size=1) +
+    ylab("Density")+
+    xlab("Studentized Residuals")+
+    ggtitle("Distribution of Studentized Residuals")
+  plot(p)
   # http://www.stat.columbia.edu/~martin/W2024/R7.pdf
   # Influential plots
   inf.meas = influence.measures(model)
@@ -318,14 +315,22 @@ plot.diagnostics <-  function(model, train) {
   
   # Leverage plot
   lev = hat(model.matrix(model))
-  plot(lev, ylab = 'Leverage - check')
-  
+  df=tibble::rownames_to_column(as.data.frame(lev),'id')
+  p=ggplot(data=df,aes(x=as.numeric(id),y=lev)) +
+    geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+    ylab('Leverage - check') + 
+    xlab('Index')
+  plot(p)
   # Cook's Distance
   cd = cooks.distance(model)
-  plot(cd,ylab="Cooks distances")
-  abline(4/nrow(train),0)
-  abline(1,0)
-  
+  df=tibble::rownames_to_column(as.data.frame(cd),'id')
+  p=ggplot(data=df,aes(x=as.numeric(id),y=cd)) +
+    geom_point(color='blue',alpha=0.5,shape=20,size=2) +
+    geom_text(data=filter(df,cd>15/nrow(train)),aes(label=id),check_overlap=T,size=3,vjust=-.5)+
+    ylab('Cooks distances') + 
+    geom_hline(yintercept = c(4/nrow(train),0),size=1)+
+    xlab('Index')
+  plot(p)
   print (paste("Number of data points that have Cook's D > 4/n: ", length(cd[cd > 4/nrow(train)]), sep = "")) 
   print (paste("Number of data points that have Cook's D > 1: ", length(cd[cd > 1]), sep = "")) 
   return(cd)
@@ -623,7 +628,7 @@ feature.names = n[!n %in% label.names]
 ```{r Full Model}
 model.full = lm(formula , data.train)
 summary(model.full)
-cd.full = plot.diagnostics(model.full, data.train)
+cd.full = plot.diagnostics(model=model.full, train=data.train)
 ```
 
 ## Checking with removal of high influence points
