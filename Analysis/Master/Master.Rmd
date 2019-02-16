@@ -4,12 +4,12 @@ author: "Joanna Duran, Nikhil Gupta, Max Moro"
 date: "`r Sys.time()`"
 always_allow_html: yes
 output:
- word_document:
-   reference_docx: word_template.docx
  html_document:
    toc: true
    toc_float: true
    toc_depth: 3
+ word_document:
+   reference_docx: word_template.docx
 params:
   output.var: 'y3'
   log.pred: TRUE
