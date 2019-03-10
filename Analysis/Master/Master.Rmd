@@ -656,6 +656,13 @@ cd.full = plot.diagnostics(model=model.full, train=data.train)
 ## Checking with removal of high influence points
 ```{r HighInfluenceCheck, cache=T}
 high.cd = names(cd.full[cd.full > 4/nrow(data.train)])
+
+#save dataset with high.cd flagged
+t = data.train %>% 
+  rownames_to_column() %>%
+  mutate(high.cd = ifelse(rowname %in% high.cd,1,0))
+write.csv(t,file='data_high_cd_flag.csv',row.names = F)
+###
 data.train2 = data.train[!(rownames(data.train)) %in% high.cd,]
 model.full2 = lm(formula , data.train2)
 summary(model.full2)
